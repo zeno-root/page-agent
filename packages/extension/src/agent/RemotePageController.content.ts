@@ -21,9 +21,20 @@ export function initPageController() {
 			window.clearInterval(intervalID)
 			intervalID = null
 		}
+		disposePageController()
+	}
+
+	function disposePageController() {
 		if (pageController) {
-			pageController.dispose()
+			const controller = pageController
 			pageController = null
+			try {
+				controller.dispose()
+			} catch (error) {
+				if (!shouldStopContentPolling(error)) {
+					console.warn('[RemotePageController.ContentScript]: failed to dispose controller', error)
+				}
+			}
 		}
 	}
 
@@ -96,10 +107,7 @@ export function initPageController() {
 			}
 
 			if (!isAgentRunning && agentInTouch) {
-				if (pageController) {
-					pageController.dispose()
-					pageController = null
-				}
+				disposePageController()
 			}
 		} catch (error) {
 			if (!shouldStopContentPolling(error)) {

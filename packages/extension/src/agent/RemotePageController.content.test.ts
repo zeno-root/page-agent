@@ -6,6 +6,7 @@ import { initPageController } from './RemotePageController.content'
 const pageControllerState = vi.hoisted(() => ({
 	instances: [] as { disposed: boolean }[],
 	throwOnConstruct: false,
+	throwOnDispose: false,
 }))
 
 vi.mock('@page-agent/page-controller', () => {
@@ -28,6 +29,9 @@ vi.mock('@page-agent/page-controller', () => {
 		cleanUpHighlights() {}
 
 		dispose() {
+			if (pageControllerState.throwOnDispose) {
+				throw new Error('Extension context invalidated.')
+			}
 			this.disposed = true
 		}
 
@@ -65,6 +69,7 @@ function installChromeMock() {
 
 	return {
 		addListener,
+		get,
 		get listener() {
 			return listener
 		},
@@ -79,6 +84,7 @@ describe('RemotePageController content script runtime guards', () => {
 		delete (globalThis as any).chrome
 		pageControllerState.instances = []
 		pageControllerState.throwOnConstruct = false
+		pageControllerState.throwOnDispose = false
 	})
 
 	it('skips startup when extension runtime APIs are unavailable', () => {
@@ -105,5 +111,21 @@ describe('RemotePageController content script runtime guards', () => {
 			error: 'Extension context invalidated.',
 			success: false,
 		})
+	})
+
+	it('swallows context invalidation while disposing a stale page controller', async () => {
+		vi.useFakeTimers()
+		const chromeMock = installChromeMock()
+		initPageController()
+
+		const sendResponse = vi.fn()
+		chromeMock.listener?.({ type: 'PAGE_CONTROL', action: 'get_browser_state' }, {}, sendResponse)
+		await Promise.resolve()
+		expect(pageControllerState.instances).toHaveLength(1)
+
+		chromeMock.get.mockRejectedValueOnce(new Error('Extension context invalidated.'))
+		pageControllerState.throwOnDispose = true
+
+		await expect(vi.advanceTimersByTimeAsync(500)).resolves.toBeDefined()
 	})
 })
