@@ -7,12 +7,16 @@
  * All public methods are async for potential remote calling support.
  */
 import {
+	type UploadFilePayload,
 	clickElement,
 	getElementByIndex,
+	hoverElement as hoverElementAction,
 	inputTextElement,
+	pressKey as pressKeyAction,
 	scrollHorizontally,
 	scrollVertically,
 	selectOptionElement,
+	uploadFileElement,
 } from './actions'
 import * as dom from './dom'
 import type { FlatDomTree, InteractiveElementDomNode } from './dom/dom_tree/type'
@@ -269,6 +273,47 @@ export class PageController extends EventTarget {
 	}
 
 	/**
+	 * Hover element by index
+	 */
+	async hoverElement(index: number): Promise<ActionResult> {
+		try {
+			this.assertIndexed()
+			const element = getElementByIndex(this.selectorMap, index)
+			const elemText = this.elementTextMap.get(index)
+			await hoverElementAction(element)
+
+			return {
+				success: true,
+				message: `✅ Hovered element (${elemText ?? index}).`,
+			}
+		} catch (error) {
+			return {
+				success: false,
+				message: `❌ Failed to hover element: ${error}`,
+			}
+		}
+	}
+
+	/**
+	 * Press a keyboard key or supported key combination.
+	 */
+	async pressKey(key: string): Promise<ActionResult> {
+		try {
+			await pressKeyAction(key)
+
+			return {
+				success: true,
+				message: `✅ Pressed key (${key}).`,
+			}
+		} catch (error) {
+			return {
+				success: false,
+				message: `❌ Failed to press key: ${error}`,
+			}
+		}
+	}
+
+	/**
 	 * Input text into element by index
 	 */
 	async inputText(index: number, text: string): Promise<ActionResult> {
@@ -376,6 +421,84 @@ export class PageController extends EventTarget {
 	}
 
 	/**
+	 * Extract normalized page text without scripts/styles.
+	 */
+	async extractPageText(options: { maxLength?: number } = {}): Promise<ActionResult> {
+		try {
+			const text = normalizeExtractedText(document.body)
+			const bounded = boundText(text, options.maxLength ?? 8_000)
+			return {
+				success: true,
+				message: `✅ Extracted page text (${text.length} chars): ${bounded}`,
+			}
+		} catch (error) {
+			return {
+				success: false,
+				message: `❌ Failed to extract page text: ${error}`,
+			}
+		}
+	}
+
+	/**
+	 * Extract a structured HTML table from an indexed element or the first table.
+	 */
+	async extractStructuredTable(
+		options: {
+			index?: number
+			maxLength?: number
+		} = {}
+	): Promise<ActionResult> {
+		try {
+			const table = this.resolveTableElement(options.index)
+			if (!table) throw new Error('No table found on current page.')
+			const json = JSON.stringify(extractTable(table))
+			const bounded = boundText(json, options.maxLength ?? 8_000)
+			return {
+				success: true,
+				message: `✅ Extracted structured table: ${bounded}`,
+			}
+		} catch (error) {
+			return {
+				success: false,
+				message: `❌ Failed to extract structured table: ${error}`,
+			}
+		}
+	}
+
+	private resolveTableElement(index?: number): HTMLTableElement | null {
+		if (index !== undefined) {
+			this.assertIndexed()
+			const element = getElementByIndex(this.selectorMap, index)
+			if (element instanceof HTMLTableElement) return element
+			return element.closest('table')
+		}
+		return document.querySelector('table')
+	}
+
+	/**
+	 * Upload a user-selected file into a file input by index.
+	 */
+	async uploadFile(index: number, file?: UploadFilePayload): Promise<ActionResult> {
+		try {
+			this.assertIndexed()
+			if (!file) throw new Error('No upload file selected')
+			const element = getElementByIndex(this.selectorMap, index)
+			const elemText = this.elementTextMap.get(index)
+			await uploadFileElement(element, file)
+
+			return {
+				success: true,
+				message: `✅ Uploaded file (${file.name}) into element (${elemText ?? index}).`,
+			}
+		} catch (error) {
+			return {
+				success: false,
+				message: `❌ Failed to upload file: ${error}`,
+			}
+		}
+	}
+
+	/**
 	 * Execute arbitrary JavaScript on the page.
 	 * The optional `signal` is exposed to the script scope so cooperative code
 	 * can abort promptly when the task is stopped.
@@ -430,6 +553,33 @@ export class PageController extends EventTarget {
 		this.mask?.dispose()
 		this.mask = null
 	}
+}
+
+function normalizeExtractedText(root: HTMLElement): string {
+	const clone = root.cloneNode(true) as HTMLElement
+	clone.querySelectorAll('script, style, noscript, template').forEach((element) => element.remove())
+	return (clone.textContent || '').replace(/\s+/g, ' ').trim()
+}
+
+function boundText(text: string, maxLength: number): string {
+	if (text.length <= maxLength) return text
+	const omitted = text.length - maxLength
+	return `${text.slice(0, maxLength)}... [truncated ${omitted} chars]`
+}
+
+function extractTable(table: HTMLTableElement): { headers: string[]; rows: string[][] } {
+	const rows = Array.from(table.rows)
+	const headerRow = rows.find((row) => row.querySelector('th')) || rows[0]
+	const headers = headerRow ? Array.from(headerRow.cells).map(cellText) : []
+	const dataRows = rows.filter((row) => row !== headerRow)
+	return {
+		headers,
+		rows: dataRows.map((row) => Array.from(row.cells).map(cellText)),
+	}
+}
+
+function cellText(cell: HTMLTableCellElement): string {
+	return (cell.textContent || '').replace(/\s+/g, ' ').trim()
 }
 
 export * from './actions'

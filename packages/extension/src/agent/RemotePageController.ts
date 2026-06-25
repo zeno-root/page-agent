@@ -1,6 +1,10 @@
-import type { BrowserState } from '@page-agent/page-controller'
+import type { BrowserState, UploadFilePayload } from '@page-agent/page-controller'
 
 import type { TabsController } from './TabsController'
+import {
+	EXECUTE_JAVASCRIPT_MAX_RESULT_LENGTH,
+	EXECUTE_JAVASCRIPT_TIMEOUT_MS,
+} from './executeJavascriptPolicy'
 
 const PREFIX = '[RemotePageController]'
 
@@ -25,9 +29,14 @@ function sendMessage(message: {
  */
 export class RemotePageController {
 	tabsController: TabsController
+	private getSelectedUploadFile?: () => UploadFilePayload | null
 
-	constructor(tabsController: TabsController) {
+	constructor(
+		tabsController: TabsController,
+		options: { getSelectedUploadFile?: () => UploadFilePayload | null } = {}
+	) {
 		this.tabsController = tabsController
+		this.getSelectedUploadFile = options.getSelectedUploadFile
 	}
 
 	get currentTabId(): number | null {
@@ -121,6 +130,14 @@ export class RemotePageController {
 		return this.remoteCallDomAction('input_text', args)
 	}
 
+	async hoverElement(...args: any[]): Promise<DomActionReturn> {
+		return this.remoteCallDomAction('hover_element', args)
+	}
+
+	async pressKey(...args: any[]): Promise<DomActionReturn> {
+		return this.remoteCallDomAction('press_key', args)
+	}
+
 	async selectOption(...args: any[]): Promise<DomActionReturn> {
 		return this.remoteCallDomAction('select_option', args)
 	}
@@ -133,7 +150,32 @@ export class RemotePageController {
 		return this.remoteCallDomAction('scroll_horizontally', args)
 	}
 
-	// `execute_javascript` is intentionally not implemented: AbortSignal cannot cross context
+	async extractPageText(...args: any[]): Promise<DomActionReturn> {
+		return this.remoteCallDomAction('extract_page_text', args)
+	}
+
+	async extractStructuredTable(...args: any[]): Promise<DomActionReturn> {
+		return this.remoteCallDomAction('extract_structured_table', args)
+	}
+
+	async uploadFile(index: number): Promise<DomActionReturn> {
+		const selectedFile = this.getSelectedUploadFile?.()
+		if (!selectedFile) {
+			return {
+				success: false,
+				message: 'No upload file selected. Select a file in the Side Panel before upload_file.',
+			}
+		}
+		return this.remoteCallDomAction('upload_file', [index, selectedFile])
+	}
+
+	async executeJavascript(script: string, _signal?: AbortSignal): Promise<DomActionReturn> {
+		return this.remoteCallPageControl('execute_javascript', {
+			script,
+			timeoutMs: EXECUTE_JAVASCRIPT_TIMEOUT_MS,
+			maxLength: EXECUTE_JAVASCRIPT_MAX_RESULT_LENGTH,
+		})
+	}
 
 	/** @note Managed by content script via storage polling. */
 	async showMask(): Promise<void> {}
@@ -143,6 +185,10 @@ export class RemotePageController {
 	dispose(): void {}
 
 	private async remoteCallDomAction(action: string, payload: any[]): Promise<DomActionReturn> {
+		return this.remoteCallPageControl(action, payload)
+	}
+
+	private async remoteCallPageControl(action: string, payload: any): Promise<DomActionReturn> {
 		if (!this.currentTabId) {
 			return { success: false, message: 'RemotePageController not initialized.' }
 		}

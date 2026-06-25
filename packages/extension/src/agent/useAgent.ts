@@ -9,6 +9,7 @@ import type {
 	SupportedLanguage,
 } from '@page-agent/core'
 import type { LLMConfig } from '@page-agent/llms'
+import type { UploadFilePayload } from '@page-agent/page-controller'
 import { useCallback, useEffect, useRef, useState } from 'react'
 
 import { MultiPageAgent } from './MultiPageAgent'
@@ -22,6 +23,7 @@ export interface AdvancedConfig {
 	systemInstruction?: string
 	experimentalLlmsTxt?: boolean
 	experimentalIncludeAllTabs?: boolean
+	enableJavascriptExecution?: boolean
 	disableNamedToolChoice?: boolean
 }
 
@@ -40,7 +42,11 @@ export interface UseAgentResult {
 	configure: (config: ExtConfig) => Promise<void>
 }
 
-export function useAgent(): UseAgentResult {
+export interface UseAgentOptions {
+	getSelectedUploadFile?: () => UploadFilePayload | null
+}
+
+export function useAgent(options: UseAgentOptions = {}): UseAgentResult {
 	const agentRef = useRef<MultiPageAgent | null>(null)
 	const [status, setStatus] = useState<AgentStatus>('idle')
 	const [history, setHistory] = useState<HistoricalEvent[]>([])
@@ -52,7 +58,10 @@ export function useAgent(): UseAgentResult {
 		chrome.storage.local.get(['llmConfig', 'language', 'advancedConfig']).then((result) => {
 			let llmConfig = (result.llmConfig as LLMConfig) ?? DEMO_CONFIG
 			const language = (result.language as SupportedLanguage) || undefined
-			const advancedConfig = (result.advancedConfig as AdvancedConfig) ?? {}
+			const advancedConfig = {
+				experimentalIncludeAllTabs: true,
+				...((result.advancedConfig as AdvancedConfig) ?? {}),
+			}
 
 			// Auto-migrate legacy testing endpoints
 			const migrated = migrateLegacyEndpoint(llmConfig)
@@ -73,6 +82,7 @@ export function useAgent(): UseAgentResult {
 		const { systemInstruction, ...agentConfig } = config
 		const agent = new MultiPageAgent({
 			...agentConfig,
+			getSelectedUploadFile: options.getSelectedUploadFile,
 			instructions: systemInstruction ? { system: systemInstruction } : undefined,
 		})
 		agentRef.current = agent
@@ -104,7 +114,7 @@ export function useAgent(): UseAgentResult {
 			agent.removeEventListener('activity', handleActivity)
 			agent.dispose()
 		}
-	}, [config])
+	}, [config, options.getSelectedUploadFile])
 
 	const execute = useCallback(async (task: string) => {
 		const agent = agentRef.current
@@ -126,6 +136,7 @@ export function useAgent(): UseAgentResult {
 			systemInstruction,
 			experimentalLlmsTxt,
 			experimentalIncludeAllTabs,
+			enableJavascriptExecution,
 			disableNamedToolChoice,
 			...llmConfig
 		}: ExtConfig) => {
@@ -140,6 +151,7 @@ export function useAgent(): UseAgentResult {
 				systemInstruction,
 				experimentalLlmsTxt,
 				experimentalIncludeAllTabs,
+				enableJavascriptExecution,
 				disableNamedToolChoice,
 			}
 			await chrome.storage.local.set({ advancedConfig })

@@ -14,7 +14,15 @@ import {
 import { useEffect, useState } from 'react'
 import { siGithub } from 'simple-icons'
 
-import { DEMO_BASE_URL, DEMO_MODEL, isTestingEndpoint } from '@/agent/constants'
+import {
+	DEMO_BASE_URL,
+	DEMO_MODEL,
+	INDOFUN_V18_PROXY_API_KEY_LABEL,
+	INDOFUN_V18_PROXY_BASE_URL,
+	INDOFUN_V18_PROXY_MODEL,
+	isIndofunV18ProxyEndpoint,
+	isTestingEndpoint,
+} from '@/agent/constants'
 import type { ExtConfig, LanguagePreference } from '@/agent/useAgent'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -39,6 +47,9 @@ export function ConfigPanel({ config, onSave, onClose }: ConfigPanelProps) {
 	const [experimentalIncludeAllTabs, setExperimentalIncludeAllTabs] = useState(
 		config?.experimentalIncludeAllTabs ?? false
 	)
+	const [enableJavascriptExecution, setEnableJavascriptExecution] = useState(
+		config?.enableJavascriptExecution ?? false
+	)
 	const [disableNamedToolChoice, setDisableNamedToolChoice] = useState(
 		config?.disableNamedToolChoice ?? false
 	)
@@ -48,6 +59,7 @@ export function ConfigPanel({ config, onSave, onClose }: ConfigPanelProps) {
 	const [copied, setCopied] = useState(false)
 	const [showToken, setShowToken] = useState(false)
 	const [showApiKey, setShowApiKey] = useState(false)
+	const usingIndofunV18Proxy = isIndofunV18ProxyEndpoint(baseURL)
 
 	const [prevConfig, setPrevConfig] = useState(config)
 	if (prevConfig !== config) {
@@ -60,6 +72,7 @@ export function ConfigPanel({ config, onSave, onClose }: ConfigPanelProps) {
 		setSystemInstruction(config?.systemInstruction ?? '')
 		setExperimentalLlmsTxt(config?.experimentalLlmsTxt ?? false)
 		setExperimentalIncludeAllTabs(config?.experimentalIncludeAllTabs ?? false)
+		setEnableJavascriptExecution(config?.enableJavascriptExecution ?? false)
 		setDisableNamedToolChoice(config?.disableNamedToolChoice ?? false)
 	}
 
@@ -107,11 +120,18 @@ export function ConfigPanel({ config, onSave, onClose }: ConfigPanelProps) {
 				systemInstruction: systemInstruction || undefined,
 				experimentalLlmsTxt,
 				experimentalIncludeAllTabs,
+				enableJavascriptExecution,
 				disableNamedToolChoice,
 			})
 		} finally {
 			setSaving(false)
 		}
+	}
+
+	const applyIndofunV18Proxy = () => {
+		setBaseURL(INDOFUN_V18_PROXY_BASE_URL)
+		setModel(INDOFUN_V18_PROXY_MODEL)
+		setApiKey('')
 	}
 
 	return (
@@ -201,6 +221,15 @@ export function ConfigPanel({ config, onSave, onClose }: ConfigPanelProps) {
 				/>
 			</div>
 
+			<Button
+				variant="outline"
+				size="sm"
+				className="h-8 text-xs cursor-pointer"
+				onClick={applyIndofunV18Proxy}
+			>
+				Use v1.8 proxy
+			</Button>
+
 			{/* Testing API notice */}
 			{isTestingEndpoint(baseURL) && (
 				<div className="p-2.5 rounded-md border border-amber-500/30 bg-amber-500/5 text-[11px] text-muted-foreground leading-relaxed">
@@ -214,6 +243,12 @@ export function ConfigPanel({ config, onSave, onClose }: ConfigPanelProps) {
 					>
 						Terms of Use & Privacy Policy
 					</a>
+				</div>
+			)}
+
+			{usingIndofunV18Proxy && (
+				<div className="p-2.5 rounded-md border border-emerald-500/30 bg-emerald-500/5 text-[11px] text-muted-foreground leading-relaxed">
+					v1.8 proxy keeps the real LLM key on the server. Paste your v1.8 login token below.
 				</div>
 			)}
 
@@ -232,13 +267,13 @@ export function ConfigPanel({ config, onSave, onClose }: ConfigPanelProps) {
 
 			<div className="flex flex-col gap-1.5">
 				<label htmlFor="api-key" className="text-xs text-muted-foreground">
-					API Key
+					{usingIndofunV18Proxy ? INDOFUN_V18_PROXY_API_KEY_LABEL : 'API Key'}
 				</label>
 				<div className="flex gap-2 items-center">
 					<Input
 						id="api-key"
 						type={showApiKey ? 'text' : 'password'}
-						// placeholder="sk-..."
+						placeholder={usingIndofunV18Proxy ? 'Paste v1.8 login token' : 'sk-...'}
 						value={apiKey}
 						onChange={(e) => setApiKey(e.target.value)}
 						className="text-xs h-8"
@@ -318,10 +353,18 @@ export function ConfigPanel({ config, onSave, onClose }: ConfigPanelProps) {
 					</label>
 
 					<label className="flex items-center justify-between cursor-pointer">
-						<span className="text-xs text-muted-foreground">Experimental include all tabs</span>
+						<span className="text-xs text-muted-foreground">Include all tabs</span>
 						<Switch
 							checked={experimentalIncludeAllTabs}
 							onCheckedChange={setExperimentalIncludeAllTabs}
+						/>
+					</label>
+
+					<label className="flex items-center justify-between cursor-pointer">
+						<span className="text-xs text-muted-foreground">Enable JavaScript execution</span>
+						<Switch
+							checked={enableJavascriptExecution}
+							onCheckedChange={setEnableJavascriptExecution}
 						/>
 					</label>
 				</>

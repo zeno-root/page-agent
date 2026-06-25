@@ -3,6 +3,12 @@
  */
 import { PageController } from '@page-agent/page-controller'
 
+import {
+	EXECUTE_JAVASCRIPT_MAX_RESULT_LENGTH,
+	EXECUTE_JAVASCRIPT_TIMEOUT_MS,
+	runExecuteJavascriptWithPolicy,
+} from './executeJavascriptPolicy'
+
 export function initPageController() {
 	let pageController: PageController | null = null
 	let intervalID: number | null = null
@@ -78,11 +84,28 @@ export function initPageController() {
 			case 'clean_up_highlights':
 			case 'click_element':
 			case 'input_text':
+			case 'hover_element':
+			case 'press_key':
 			case 'select_option':
 			case 'scroll':
 			case 'scroll_horizontally':
-			case 'execute_javascript':
+			case 'extract_page_text':
+			case 'extract_structured_table':
+			case 'upload_file':
 				pc[methodName](...(payload || []))
+					.then((result: any) => sendResponse(result))
+					.catch((error: any) =>
+						sendResponse({
+							success: false,
+							error: error instanceof Error ? error.message : String(error),
+						})
+					)
+				break
+			case 'execute_javascript':
+				runExecuteJavascriptWithPolicy(() => pc.executeJavascript(String(payload?.script || '')), {
+					timeoutMs: Number(payload?.timeoutMs) || EXECUTE_JAVASCRIPT_TIMEOUT_MS,
+					maxLength: Number(payload?.maxLength) || EXECUTE_JAVASCRIPT_MAX_RESULT_LENGTH,
+				})
 					.then((result: any) => sendResponse(result))
 					.catch((error: any) =>
 						sendResponse({
@@ -120,12 +143,22 @@ function getMethodName(action: string): string {
 			return 'clickElement' as const
 		case 'input_text':
 			return 'inputText' as const
+		case 'hover_element':
+			return 'hoverElement' as const
+		case 'press_key':
+			return 'pressKey' as const
 		case 'select_option':
 			return 'selectOption' as const
 		case 'scroll':
 			return 'scroll' as const
 		case 'scroll_horizontally':
 			return 'scrollHorizontally' as const
+		case 'extract_page_text':
+			return 'extractPageText' as const
+		case 'extract_structured_table':
+			return 'extractStructuredTable' as const
+		case 'upload_file':
+			return 'uploadFile' as const
 		case 'execute_javascript':
 			return 'executeJavascript' as const
 

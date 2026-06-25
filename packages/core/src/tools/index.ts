@@ -105,6 +105,35 @@ tools.set(
 )
 
 tools.set(
+	'hover_element',
+	tool({
+		description: 'Hover element by index to reveal hover menus or tooltips.',
+		inputSchema: z.object({
+			index: z.int().min(0),
+		}),
+		execute: async function (this: PageAgentCore, input) {
+			const result = await this.pageController.hoverElement(input.index)
+			return result.message
+		},
+	})
+)
+
+tools.set(
+	'press_key',
+	tool({
+		description:
+			'Press a keyboard key or simple modifier combination such as Enter, Escape, Tab, ArrowDown, Meta+L, Ctrl+A, Ctrl+C, or Ctrl+V.',
+		inputSchema: z.object({
+			key: z.string(),
+		}),
+		execute: async function (this: PageAgentCore, input) {
+			const result = await this.pageController.pressKey(input.key)
+			return result.message
+		},
+	})
+)
+
+tools.set(
 	'input_text',
 	tool({
 		description: 'Click and type text into an interactive input element',
@@ -180,6 +209,55 @@ tools.set(
 )
 
 tools.set(
+	'extract_page_text',
+	tool({
+		description:
+			'Extract normalized text from the current page. Use this for summaries or reading dense pages without relying on interactive element indexes.',
+		inputSchema: z.object({
+			max_length: z.number().int().min(200).max(20_000).optional().default(8_000),
+		}),
+		execute: async function (this: PageAgentCore, input) {
+			const result = await this.pageController.extractPageText({ maxLength: input.max_length })
+			return result.message
+		},
+	})
+)
+
+tools.set(
+	'extract_structured_table',
+	tool({
+		description:
+			'Extract rows from an HTML table. Without index, extracts the first table on the page. With index, extracts the nearest table for that indexed element.',
+		inputSchema: z.object({
+			index: z.int().min(0).optional(),
+			max_length: z.number().int().min(200).max(20_000).optional().default(8_000),
+		}),
+		execute: async function (this: PageAgentCore, input) {
+			const result = await this.pageController.extractStructuredTable({
+				index: input.index,
+				maxLength: input.max_length,
+			})
+			return result.message
+		},
+	})
+)
+
+tools.set(
+	'upload_file',
+	tool({
+		description:
+			'Upload the file explicitly selected by the user in the host UI to a file input element by index. Do not invent local file paths; this tool only works after the user has selected a file.',
+		inputSchema: z.object({
+			index: z.int().min(0),
+		}),
+		execute: async function (this: PageAgentCore, input) {
+			const result = await this.pageController.uploadFile(input.index)
+			return result.message
+		},
+	})
+)
+
+tools.set(
 	'execute_javascript',
 	tool({
 		description:
@@ -198,5 +276,4 @@ tools.set(
 )
 
 // @todo send_keys
-// @todo upload_file
 // @todo extract_structured_data

@@ -1,4 +1,15 @@
-import { History, Send, Settings, Square } from 'lucide-react'
+import type { UploadFilePayload } from '@page-agent/page-controller'
+import {
+	Camera,
+	Crosshair,
+	History,
+	RefreshCw,
+	Send,
+	Settings,
+	Square,
+	Upload,
+	X,
+} from 'lucide-react'
 import { useCallback, useEffect, useRef, useState } from 'react'
 
 import { ConfigPanel } from '@/components/ConfigPanel'
@@ -23,13 +34,89 @@ type View =
 	| { name: 'history' }
 	| { name: 'history-detail'; sessionId: string }
 
+interface PanelTab {
+	id: number
+	title?: string
+	url?: string
+	status?: chrome.tabs.Tab['status']
+	windowId?: number
+	active?: boolean
+}
+
+interface UploadFileSummary {
+	name: string
+	size: number
+	type?: string
+}
+
+const MAX_UPLOAD_FILE_BYTES = 10 * 1024 * 1024
+
 export default function App() {
 	const [view, setView] = useState<View>({ name: 'chat' })
 	const [inputValue, setInputValue] = useState('')
+	const [currentTarget, setCurrentTarget] = useState<PanelTab | null>(null)
+	const [visibleTabs, setVisibleTabs] = useState<PanelTab[]>([])
+	const [selectedUploadFileSummary, setSelectedUploadFileSummary] =
+		useState<UploadFileSummary | null>(null)
 	const historyRef = useRef<HTMLDivElement>(null)
 	const textareaRef = useRef<HTMLTextAreaElement>(null)
+	const uploadInputRef = useRef<HTMLInputElement>(null)
+	const selectedUploadFileRef = useRef<UploadFilePayload | null>(null)
 
-	const { status, history, activity, currentTask, config, execute, stop, configure } = useAgent()
+	const getSelectedUploadFile = useCallback(() => selectedUploadFileRef.current, [])
+
+	const { status, history, activity, currentTask, config, execute, stop, configure } = useAgent({
+		getSelectedUploadFile,
+	})
+
+	const refreshCurrentTarget = useCallback(async () => {
+		const [result, activeTabs] = await Promise.all([
+			chrome.storage.local.get('currentTabId'),
+			chrome.tabs.query({ active: true, currentWindow: true }),
+		])
+		const activeTab = activeTabs[0]
+		const windowId = activeTab?.windowId
+		const tabs =
+			typeof windowId === 'number'
+				? await chrome.tabs.query({ windowId })
+				: await chrome.tabs.query({ currentWindow: true })
+		const panelTabs = tabs
+			.filter((tab): tab is chrome.tabs.Tab & { id: number } => typeof tab.id === 'number')
+			.map(
+				(tab): PanelTab => ({
+					id: tab.id,
+					title: tab.title,
+					url: tab.url,
+					status: tab.status,
+					windowId: tab.windowId,
+					active: tab.active,
+				})
+			)
+		setVisibleTabs(panelTabs)
+
+		const currentTabId = result.currentTabId
+		if (typeof currentTabId !== 'number') {
+			const fallbackTarget = panelTabs.find((tab) => tab.active) ?? null
+			setCurrentTarget(fallbackTarget)
+			return
+		}
+
+		const listedTarget = panelTabs.find((tab) => tab.id === currentTabId)
+		if (listedTarget) {
+			setCurrentTarget(listedTarget)
+			return
+		}
+
+		setCurrentTarget({ id: currentTabId })
+	}, [])
+
+	useEffect(() => {
+		refreshCurrentTarget().catch(console.error)
+		const interval = window.setInterval(() => {
+			refreshCurrentTarget().catch(console.error)
+		}, 1_500)
+		return () => window.clearInterval(interval)
+	}, [refreshCurrentTarget])
 
 	// Persist session when task finishes
 	const prevStatusRef = useRef(status)
@@ -83,6 +170,80 @@ export default function App() {
 		console.log('[SidePanel] Stopping task...')
 		stop()
 	}, [stop])
+
+	const activateCurrentTarget = useCallback(async () => {
+		if (!currentTarget?.id) return
+		await chrome.tabs.update(currentTarget.id, { active: true })
+		await refreshCurrentTarget()
+	}, [currentTarget?.id, refreshCurrentTarget])
+
+	const setCurrentTargetTab = useCallback(
+		async (tab: PanelTab) => {
+			await chrome.storage.local.set({ currentTabId: tab.id })
+			setCurrentTarget(tab)
+			await refreshCurrentTarget()
+		},
+		[refreshCurrentTarget]
+	)
+
+	const activateTab = useCallback(
+		async (tab: PanelTab) => {
+			await chrome.storage.local.set({ currentTabId: tab.id })
+			await chrome.tabs.update(tab.id, { active: true })
+			await refreshCurrentTarget()
+		},
+		[refreshCurrentTarget]
+	)
+
+	const captureVisibleTab = useCallback(async () => {
+		const windowId = currentTarget?.windowId
+		if (!windowId) return
+		const dataUrl = await chrome.tabs.captureVisibleTab(windowId, { format: 'png' })
+		console.info('[SidePanel] Captured visible tab', {
+			tabId: currentTarget.id,
+			windowId,
+			length: dataUrl.length,
+		})
+	}, [currentTarget])
+
+	const handleUploadFileChange = useCallback(async (event: React.ChangeEvent<HTMLInputElement>) => {
+		const file = event.currentTarget.files?.[0] ?? null
+		if (!file) {
+			selectedUploadFileRef.current = null
+			setSelectedUploadFileSummary(null)
+			return
+		}
+
+		if (file.size > MAX_UPLOAD_FILE_BYTES) {
+			selectedUploadFileRef.current = null
+			setSelectedUploadFileSummary(null)
+			event.currentTarget.value = ''
+			window.alert(
+				`Upload file is too large. Maximum size is ${formatBytes(MAX_UPLOAD_FILE_BYTES)}.`
+			)
+			return
+		}
+
+		const contentBase64 = await readFileBase64(file)
+		selectedUploadFileRef.current = {
+			name: file.name,
+			type: file.type,
+			contentBase64,
+			size: file.size,
+			lastModified: file.lastModified,
+		}
+		setSelectedUploadFileSummary({
+			name: file.name,
+			type: file.type,
+			size: file.size,
+		})
+	}, [])
+
+	const clearUploadFile = useCallback(() => {
+		selectedUploadFileRef.current = null
+		setSelectedUploadFileSummary(null)
+		if (uploadInputRef.current) uploadInputRef.current.value = ''
+	}, [])
 
 	const handleKeyDown = (e: React.KeyboardEvent) => {
 		if (e.key === 'Enter' && !e.shiftKey && !e.nativeEvent.isComposing) {
@@ -177,6 +338,108 @@ export default function App() {
 					</div>
 				)}
 
+				<div className="border-b px-3 py-2 bg-muted/20 space-y-2">
+					<div className="grid grid-cols-2 gap-1 text-[10px] text-muted-foreground">
+						<span>Mode: Unrestricted</span>
+						<span>Scope: All accessible pages</span>
+						<span>Dangerous tools: Enabled</span>
+						<span>
+							{config?.enableJavascriptExecution ? 'JavaScript: Enabled' : 'JavaScript: Disabled'}
+						</span>
+					</div>
+					<div className="text-[11px]">
+						<div className="font-medium">Current Target</div>
+						<div className="truncate text-muted-foreground" title={currentTarget?.url || ''}>
+							{currentTarget
+								? `[${currentTarget.id}] ${currentTarget.title || '(untitled)'} - ${
+										currentTarget.url || '(url unavailable)'
+									}`
+								: 'No target selected'}
+						</div>
+					</div>
+					<div className="flex items-center gap-1">
+						<Button
+							variant="outline"
+							size="sm"
+							className="h-7 text-[11px] cursor-pointer"
+							onClick={() => refreshCurrentTarget().catch(console.error)}
+							title="Refresh tabs"
+						>
+							<RefreshCw className="size-3" />
+							Refresh tabs
+						</Button>
+						<Button
+							variant="outline"
+							size="sm"
+							className="h-7 text-[11px] cursor-pointer"
+							onClick={() => activateCurrentTarget().catch(console.error)}
+							disabled={!currentTarget?.id}
+							title="Activate current target"
+						>
+							<Crosshair className="size-3" />
+							Activate
+						</Button>
+						<Button
+							variant="outline"
+							size="sm"
+							className="h-7 text-[11px] cursor-pointer"
+							onClick={() => captureVisibleTab().catch(console.error)}
+							disabled={!currentTarget?.windowId}
+							title="Capture visible tab"
+						>
+							<Camera className="size-3" />
+							Capture
+						</Button>
+					</div>
+					<div className="text-[11px] space-y-1">
+						<div className="flex items-center justify-between">
+							<div className="font-medium">Tab List</div>
+							<span className="text-[10px] text-muted-foreground">{visibleTabs.length} tabs</span>
+						</div>
+						<div className="max-h-28 overflow-y-auto rounded-md border bg-background/70 divide-y">
+							{visibleTabs.length === 0 ? (
+								<div className="px-2 py-2 text-muted-foreground">No tabs found</div>
+							) : (
+								visibleTabs.map((tab) => {
+									const isCurrent = currentTarget?.id === tab.id
+									return (
+										<div
+											key={tab.id}
+											className={`grid grid-cols-[1fr_auto] items-center gap-1 px-2 py-1 ${
+												isCurrent ? 'bg-primary/10' : ''
+											}`}
+										>
+											<button
+												type="button"
+												className="min-w-0 text-left cursor-pointer"
+												onClick={() => setCurrentTargetTab(tab).catch(console.error)}
+												title={tab.url || ''}
+											>
+												<div className="truncate font-medium">
+													[{tab.id}] {tab.title || '(untitled)'}
+												</div>
+												<div className="truncate text-[10px] text-muted-foreground">
+													{tab.status || 'unknown'} - {tab.url || '(url unavailable)'}
+												</div>
+											</button>
+											<Button
+												variant={isCurrent ? 'default' : 'ghost'}
+												size="icon-sm"
+												className="size-6 cursor-pointer"
+												onClick={() => activateTab(tab).catch(console.error)}
+												title="Activate tab"
+												aria-label={`Activate tab ${tab.id}`}
+											>
+												<Crosshair className="size-3" />
+											</Button>
+										</div>
+									)
+								})
+							)}
+						</div>
+					</div>
+				</div>
+
 				{/* History */}
 				<div ref={historyRef} className="flex-1 overflow-y-auto p-3 space-y-2">
 					{showEmptyState && <EmptyState />}
@@ -192,6 +455,46 @@ export default function App() {
 
 			{/* Input */}
 			<footer className="border-t p-3">
+				<div className="mb-2 flex items-center gap-2 text-[11px]">
+					<input
+						ref={uploadInputRef}
+						type="file"
+						className="hidden"
+						onChange={handleUploadFileChange}
+					/>
+					<Button
+						variant="outline"
+						size="sm"
+						className="h-7 text-[11px] cursor-pointer"
+						onClick={() => uploadInputRef.current?.click()}
+						disabled={isRunning}
+						title="Upload file"
+					>
+						<Upload className="size-3" />
+						Upload file
+					</Button>
+					<div
+						className="min-w-0 flex-1 truncate text-muted-foreground"
+						title={selectedUploadFileSummary?.name || ''}
+					>
+						{selectedUploadFileSummary
+							? `${selectedUploadFileSummary.name} - ${formatBytes(selectedUploadFileSummary.size)}`
+							: 'No upload file selected'}
+					</div>
+					{selectedUploadFileSummary && (
+						<Button
+							variant="ghost"
+							size="icon-sm"
+							className="size-6 cursor-pointer"
+							onClick={clearUploadFile}
+							disabled={isRunning}
+							title="Clear upload file"
+							aria-label="Clear upload file"
+						>
+							<X className="size-3" />
+						</Button>
+					)}
+				</div>
 				<InputGroup className="relative rounded-lg">
 					<InputGroupTextarea
 						ref={textareaRef}
@@ -232,4 +535,24 @@ export default function App() {
 			</footer>
 		</div>
 	)
+}
+
+function readFileBase64(file: File): Promise<string> {
+	return new Promise((resolve, reject) => {
+		const reader = new FileReader()
+		reader.addEventListener('load', () => {
+			const result = typeof reader.result === 'string' ? reader.result : ''
+			resolve(result.split(',')[1] || '')
+		})
+		reader.addEventListener('error', () =>
+			reject(reader.error || new Error('Failed to read upload file'))
+		)
+		reader.readAsDataURL(file)
+	})
+}
+
+function formatBytes(bytes: number): string {
+	if (bytes < 1024) return `${bytes} B`
+	if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`
+	return `${(bytes / 1024 / 1024).toFixed(1)} MB`
 }

@@ -42,6 +42,7 @@ export class TabsController {
 			throw new Error('TabsController already disposed')
 		}
 
+		const storedCurrentTabId = await this.readStoredCurrentTabId()
 		await this.updateCurrentTabId(null)
 		this.disposed = false
 		this.port = undefined
@@ -89,9 +90,11 @@ export class TabsController {
 					})
 				}
 			}
-			if (this.tabs.find((t) => t.id === this.initialTabId)) {
-				this.currentTabId = this.initialTabId
-				await this.createTabGroup([this.initialTabId])
+			const preferredTabId =
+				this.findTrackedTabId(storedCurrentTabId) ?? this.findTrackedTabId(this.initialTabId)
+			if (preferredTabId) {
+				this.currentTabId = preferredTabId
+				await this.createTabGroup([preferredTabId])
 			}
 		} else if (includeInitialTab) {
 			const info = await sendMessage({
@@ -101,8 +104,6 @@ export class TabsController {
 			})
 
 			if (isContentScriptAllowed(info.url) && !info.pinned) {
-				this.currentTabId = this.initialTabId
-
 				this.addTab({
 					id: this.initialTabId,
 					isInitial: true,
@@ -110,6 +111,9 @@ export class TabsController {
 					title: info.title,
 					status: info.status,
 				})
+
+				this.currentTabId =
+					this.findTrackedTabId(storedCurrentTabId) ?? this.findTrackedTabId(this.initialTabId)
 
 				await this.createTabGroup([this.initialTabId])
 			}
@@ -202,6 +206,124 @@ export class TabsController {
 		}
 	}
 
+	async listTabs(): Promise<TabMeta[]> {
+		const list: TabMeta[] = []
+		for (const tab of this.tabs) {
+			try {
+				const latest = await this.getTabInfo(tab.id)
+				list.push({
+					...tab,
+					url: latest.url,
+					title: latest.title,
+					isCurrent: this.currentTabId === tab.id,
+				})
+			} catch {
+				list.push({ ...tab, isCurrent: this.currentTabId === tab.id })
+			}
+		}
+		return list
+	}
+
+	async getCurrentTab(): Promise<TabMeta | null> {
+		if (!this.currentTabId) return null
+		const tab = this.tabs.find((t) => t.id === this.currentTabId)
+		if (!tab) return null
+		const [current] = await this.listTabs().then((tabs) => tabs.filter((t) => t.id === tab.id))
+		return current || tab
+	}
+
+	async activateTab(tabId: number): Promise<string> {
+		debug('activateTab', tabId)
+		this.assertTrackedTab(tabId)
+
+		const result = await sendMessage({
+			type: 'TAB_CONTROL',
+			action: 'activate_tab',
+			payload: { tabId },
+		})
+
+		if (!result?.success) {
+			throw new Error(`Failed to activate tab ID ${tabId}: ${result?.error}`)
+		}
+
+		await this.updateCurrentTabId(tabId)
+		return `✅ Activated tab ID ${tabId}.`
+	}
+
+	async reloadTab(tabId?: number): Promise<string> {
+		const targetTabId = this.resolveTabId(tabId)
+		debug('reloadTab', targetTabId)
+		const tab = this.assertTrackedTab(targetTabId)
+
+		const result = await sendMessage({
+			type: 'TAB_CONTROL',
+			action: 'reload_tab',
+			payload: { tabId: targetTabId },
+		})
+
+		if (!result?.success) {
+			throw new Error(`Failed to reload tab ID ${targetTabId}: ${result?.error}`)
+		}
+
+		tab.status = 'loading'
+		return `✅ Reloaded tab ID ${targetTabId}.`
+	}
+
+	async goBack(tabId?: number): Promise<string> {
+		const targetTabId = this.resolveTabId(tabId)
+		debug('goBack', targetTabId)
+		this.assertTrackedTab(targetTabId)
+
+		const result = await sendMessage({
+			type: 'TAB_CONTROL',
+			action: 'go_back',
+			payload: { tabId: targetTabId },
+		})
+
+		if (!result?.success) {
+			throw new Error(`Failed to go back in tab ID ${targetTabId}: ${result?.error}`)
+		}
+
+		return `✅ Navigated back in tab ID ${targetTabId}.`
+	}
+
+	async goForward(tabId?: number): Promise<string> {
+		const targetTabId = this.resolveTabId(tabId)
+		debug('goForward', targetTabId)
+		this.assertTrackedTab(targetTabId)
+
+		const result = await sendMessage({
+			type: 'TAB_CONTROL',
+			action: 'go_forward',
+			payload: { tabId: targetTabId },
+		})
+
+		if (!result?.success) {
+			throw new Error(`Failed to go forward in tab ID ${targetTabId}: ${result?.error}`)
+		}
+
+		return `✅ Navigated forward in tab ID ${targetTabId}.`
+	}
+
+	async captureVisibleTab(): Promise<string> {
+		if (!this.windowId) throw new Error('TabsController not initialized.')
+		debug('captureVisibleTab', this.windowId)
+
+		const result = await sendMessage({
+			type: 'TAB_CONTROL',
+			action: 'capture_visible_tab',
+			payload: { windowId: this.windowId },
+		})
+
+		if (!result?.success) {
+			throw new Error(`Failed to capture visible tab: ${result?.error}`)
+		}
+
+		const dataUrl = String(result.dataUrl || '')
+		const preview = dataUrl.length > 140 ? `${dataUrl.slice(0, 140)}...` : dataUrl
+		return `✅ Captured visible tab (${dataUrl.length} chars): ${preview}`
+	}
+
 	private async createTabGroup(tabIds: number[]) {
 		const result = await sendMessage({
 			type: 'TAB_CONTROL',
@@ -239,6 +361,16 @@ export class TabsController {
 
 		this.currentTabId = tabId
 		await chrome.storage.local.set({ currentTabId: tabId })
+	}
+
+	private async readStoredCurrentTabId(): Promise<number | null> {
+		const result = await chrome.storage.local.get('currentTabId')
+		return typeof result.currentTabId === 'number' ? result.currentTabId : null
+	}
+
+	private findTrackedTabId(tabId: number | null): number | null {
+		if (typeof tabId !== 'number') return null
+		return this.tabs.some((tab) => tab.id === tabId) ? tabId : null
 	}
 
 	async getTabInfo(tabId: number): Promise<{ title: string; url: string }> {
@@ -279,15 +411,17 @@ export class TabsController {
 		return summaries.join('\n')
 	}
 
-	async waitUntilTabLoaded(tabId: number): Promise<void> {
-		const tab = this.tabs.find((t) => t.id === tabId)
-		if (!tab) throw new Error(`Tab ID ${tabId} not found in tab list.`)
+	async waitUntilTabLoaded(tabId?: number, timeoutMS = 4_000): Promise<string> {
+		const targetTabId = this.resolveTabId(tabId)
+		const tab = this.assertTrackedTab(targetTabId)
 
-		if (tab.status === 'unloaded') throw new Error(`Tab ID ${tabId} is unloaded.`)
-		if (tab.status === 'complete') return
+		if (tab.status === 'unloaded') throw new Error(`Tab ID ${targetTabId} is unloaded.`)
+		if (tab.status === 'complete') return `✅ Tab ID ${targetTabId} is loaded.`
 
-		debug('waitUntilTabLoaded', tabId)
-		await waitUntil(() => tab.status === 'complete', 4_000)
+		debug('waitUntilTabLoaded', targetTabId, timeoutMS)
+		const loaded = await waitUntil(() => tab.status === 'complete', timeoutMS)
+		if (!loaded) throw new Error(`Timed out waiting for tab ID ${targetTabId} to load.`)
+		return `✅ Tab ID ${targetTabId} finished loading.`
 	}
 
 	/**
@@ -356,6 +490,18 @@ export class TabsController {
 		this.port?.disconnect()
 		this.port = undefined
 	}
+
+	private resolveTabId(tabId?: number): number {
+		const targetTabId = tabId ?? this.currentTabId
+		if (!targetTabId) throw new Error('No current tab selected.')
+		return targetTabId
+	}
+
+	private assertTrackedTab(tabId: number): TabMeta {
+		const tab = this.tabs.find((t) => t.id === tabId)
+		if (!tab) throw new Error(`Tab ID ${tabId} not found in tab list.`)
+		return tab
+	}
 }
 
 export interface TabsInitOptions {
@@ -367,6 +513,11 @@ export type TabAction =
 	| 'get_active_tab'
 	| 'get_tab_info'
 	| 'open_new_tab'
+	| 'activate_tab'
+	| 'reload_tab'
+	| 'go_back'
+	| 'go_forward'
+	| 'capture_visible_tab'
 	| 'create_tab_group'
 	| 'update_tab_group'
 	| 'add_tab_to_group'
@@ -377,6 +528,7 @@ export type TabAction =
 interface TabMeta {
 	id: number
 	isInitial: boolean
+	isCurrent?: boolean
 	url?: string
 	title?: string
 	status?: 'loading' | 'unloaded' | 'complete'

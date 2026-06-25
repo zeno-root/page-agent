@@ -126,6 +126,152 @@ export async function clickElement(element: HTMLElement) {
 }
 
 /**
+ * Move pointer over an element and dispatch hover events.
+ *
+ * @private Internal method, subject to change at any time.
+ */
+export async function hoverElement(element: HTMLElement) {
+	await scrollIntoViewIfNeeded(element)
+	const rect = element.getBoundingClientRect()
+	const x = rect.left + rect.width / 2
+	const y = rect.top + rect.height / 2
+
+	await movePointerToElement(element, x, y)
+
+	const pointerOpts = {
+		bubbles: true,
+		cancelable: true,
+		clientX: x,
+		clientY: y,
+		pointerType: 'mouse',
+	}
+	const mouseOpts = { bubbles: true, cancelable: true, clientX: x, clientY: y, button: 0 }
+	const PointerEventCtor = element.ownerDocument.defaultView?.PointerEvent ?? MouseEvent
+
+	element.dispatchEvent(new PointerEventCtor('pointerover', pointerOpts))
+	element.dispatchEvent(new PointerEventCtor('pointerenter', { ...pointerOpts, bubbles: false }))
+	element.dispatchEvent(new MouseEvent('mouseover', mouseOpts))
+	element.dispatchEvent(new MouseEvent('mouseenter', { ...mouseOpts, bubbles: false }))
+
+	await waitFor(0.1)
+}
+
+/**
+ * Dispatch keydown and keyup to the focused element, or document body.
+ *
+ * @private Internal method, subject to change at any time.
+ */
+export async function pressKey(keyCombo: string) {
+	const doc = document
+	const target =
+		doc.activeElement instanceof HTMLElement ? doc.activeElement : doc.body || doc.documentElement
+	const parts = keyCombo
+		.split('+')
+		.map((part) => part.trim())
+		.filter(Boolean)
+	const key = normalizeKey(parts.pop() || keyCombo)
+	const modifiers = new Set(parts.map((part) => part.toLowerCase()))
+	const eventInit = {
+		key,
+		code: codeForKey(key),
+		bubbles: true,
+		cancelable: true,
+		ctrlKey: modifiers.has('ctrl') || modifiers.has('control'),
+		metaKey: modifiers.has('meta') || modifiers.has('cmd') || modifiers.has('command'),
+		altKey: modifiers.has('alt') || modifiers.has('option'),
+		shiftKey: modifiers.has('shift'),
+	}
+
+	target.dispatchEvent(new KeyboardEvent('keydown', eventInit))
+	target.dispatchEvent(new KeyboardEvent('keyup', eventInit))
+	await waitFor(0.05)
+}
+
+export interface UploadFilePayload {
+	name: string
+	type?: string
+	contentBase64: string
+	size?: number
+	lastModified?: number
+}
+
+/**
+ * Inject a user-selected file into a file input element.
+ *
+ * @private Internal method, subject to change at any time.
+ */
+export async function uploadFileElement(element: HTMLElement, filePayload: UploadFilePayload) {
+	if (!isInputElement(element) || element.type !== 'file') {
+		throw new Error('Element is not a file input')
+	}
+
+	if (!filePayload?.name || !filePayload.contentBase64) {
+		throw new Error('No upload file selected')
+	}
+
+	const file = createFile(filePayload)
+	setInputFiles(element, [file])
+
+	element.dispatchEvent(new InputEvent('input', { bubbles: true, inputType: 'insertFromDrop' }))
+	element.dispatchEvent(new Event('change', { bubbles: true }))
+	await waitFor(0.05)
+}
+
+function createFile(filePayload: UploadFilePayload): File {
+	const binary = globalThis.atob(filePayload.contentBase64)
+	const bytes = new Uint8Array(binary.length)
+	for (let i = 0; i < binary.length; i += 1) {
+		bytes[i] = binary.charCodeAt(i)
+	}
+
+	return new File([bytes], filePayload.name, {
+		type: filePayload.type || 'application/octet-stream',
+		lastModified: filePayload.lastModified,
+	})
+}
+
+function setInputFiles(input: HTMLInputElement, files: File[]) {
+	const DataTransferCtor = input.ownerDocument.defaultView?.DataTransfer ?? globalThis.DataTransfer
+	if (DataTransferCtor) {
+		const dataTransfer = new DataTransferCtor()
+		files.forEach((file) => dataTransfer.items.add(file))
+		input.files = dataTransfer.files
+		return
+	}
+
+	const fileList = files.slice() as unknown as FileList
+	Object.defineProperty(fileList, 'item', {
+		configurable: true,
+		value: (index: number) => files[index] ?? null,
+	})
+	Object.defineProperty(input, 'files', {
+		configurable: true,
+		value: fileList,
+	})
+}
+
+function normalizeKey(key: string): string {
+	const aliases: Record<string, string> = {
+		esc: 'Escape',
+		return: 'Enter',
+		space: ' ',
+		spacebar: ' ',
+		up: 'ArrowUp',
+		down: 'ArrowDown',
+		left: 'ArrowLeft',
+		right: 'ArrowRight',
+	}
+	return aliases[key.toLowerCase()] || key
+}
+
+function codeForKey(key: string): string {
+	if (/^[a-z]$/i.test(key)) return `Key${key.toUpperCase()}`
+	if (/^[0-9]$/.test(key)) return `Digit${key}`
+	if (key === ' ') return 'Space'
+	return key
+}
+
+/**
  * @private Internal method, subject to change at any time.
  */
 export async function inputTextElement(element: HTMLElement, text: string) {

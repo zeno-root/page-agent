@@ -1,4 +1,5 @@
 import { type AgentConfig, PageAgentCore } from '@page-agent/core'
+import type { UploadFilePayload } from '@page-agent/page-controller'
 
 import { RemotePageController } from './RemotePageController'
 import { TabsController } from './TabsController'
@@ -14,6 +15,8 @@ function detectLanguage(): 'en-US' | 'zh-CN' {
 interface MultiPageAgentConfig extends AgentConfig {
 	includeInitialTab?: boolean
 	experimentalIncludeAllTabs?: boolean
+	enableJavascriptExecution?: boolean
+	getSelectedUploadFile?: () => UploadFilePayload | null
 }
 
 /**
@@ -25,7 +28,9 @@ export class MultiPageAgent extends PageAgentCore {
 	constructor(config: MultiPageAgentConfig) {
 		// multi page controller
 		const tabsController = new TabsController()
-		const pageController = new RemotePageController(tabsController)
+		const pageController = new RemotePageController(tabsController, {
+			getSelectedUploadFile: config.getSelectedUploadFile,
+		})
 		const customTools = createTabTools(tabsController)
 
 		// system prompt - auto-detect language if not specified
@@ -53,14 +58,19 @@ export class MultiPageAgent extends PageAgentCore {
 
 		super({
 			...config,
-			// Disabled: AbortSignal cannot cross contexts
-			experimentalScriptExecutionTool: false,
+			experimentalScriptExecutionTool: Boolean(config.enableJavascriptExecution),
 			pageController: pageController as any,
 			customTools: customTools,
 			customSystemPrompt: systemPrompt,
 
 			onBeforeTask: async (agent) => {
 				await tabsController.init(agent.task, { includeInitialTab, experimentalIncludeAllTabs })
+				const selectedUploadFile = config.getSelectedUploadFile?.()
+				if (selectedUploadFile) {
+					agent.pushObservation(
+						`User-selected upload file available: ${selectedUploadFile.name} (${selectedUploadFile.size ?? 'unknown'} bytes).`
+					)
+				}
 			},
 
 			onBeforeStep: async (agent) => {

@@ -27,19 +27,16 @@ Page Agent extension 已有跨标签基础设施：
 | Multi-page agent | `packages/extension/src/agent/MultiPageAgent.ts` | 已使用 `TabsController` + `RemotePageController` |
 | Tab 管理 | `packages/extension/src/agent/TabsController.ts` | 已有 open/switch/close/group |
 | Tab background API | `packages/extension/src/agent/TabsController.background.ts` | 已有 active tab/window tabs/group/close |
-| 远程页面控制 | `packages/extension/src/agent/RemotePageController.ts` | 已支持 click/input/select/scroll |
-| Content script 控制器 | `packages/extension/src/agent/RemotePageController.content.ts` | 每个 tab 创建 `PageController` |
-| 工具注入 | `packages/extension/src/agent/tabTools.ts` | 已有 open/switch/close |
+| 远程页面控制 | `packages/extension/src/agent/RemotePageController.ts` | 已支持 click/input/select/scroll/hover/press key/text/table/upload/execute_javascript |
+| Content script 控制器 | `packages/extension/src/agent/RemotePageController.content.ts` | 每个 tab 创建 `PageController`，文本/表格/上传可远程调用 |
+| 工具注入 | `packages/extension/src/agent/tabTools.ts` | 已有 open/switch/close/list/activate/reload/back/forward/wait/capture |
 | 权限 | `packages/extension/wxt.config.js` | 已是 `host_permissions: ['<all_urls>']` |
 
 现有不足：
 
-- Side Panel 没有明确展示当前可控 tab 清单。
-- `tabTools` 工具面偏窄，缺少 list/activate/reload/back/forward/wait。
-- `RemotePageController` 没有远程 JS 执行、键盘、截图、上传文件等增强能力。
+- 拖拽等高级页面动作仍需后续实现。
 - `isContentScriptAllowed()` 仍排除 `file://`，后续如需本地文件页需单独处理。
-- 扩展设置仍偏通用，需要增加 Unrestricted Mode 的显式状态和风险提示。
-- v1.8 后端还没有为扩展准备稳定 LLM proxy。
+- 严格 Chromium unpacked-extension smoke 已验证 content script 注入、tab list、页面动作、文件上传、文本/表格抽取、JavaScript 执行和受限页错误路径；v1.8 proxy 与服务端日志链路仍需在用户日常 Chrome profile 中做发布前手工验收。
 
 ## 目标架构
 
@@ -117,7 +114,7 @@ v1.8 第一阶段不需要改主前端业务逻辑，除非要提供“打开扩
 
 ## 权限策略
 
-第一版按用户要求保持开放：
+第一版按用户要求保持开放，但权限仍按当前已授权 manifest 实现：
 
 ```js
 manifest: {
@@ -125,9 +122,7 @@ manifest: {
     'tabs',
     'tabGroups',
     'sidePanel',
-    'storage',
-    'scripting',
-    'activeTab'
+    'storage'
   ],
   host_permissions: ['<all_urls>']
 }
@@ -139,9 +134,24 @@ manifest: {
 - `tabGroups`：把受控 tab 分组。
 - `sidePanel`：侧边栏控制台。
 - `storage`：保存 LLM 配置、执行历史、mode 设置。
-- `scripting`：后续用于高级注入、快捷键或 fallback 操作。
-- `activeTab`：截图/当前页操作的兼容授权。
 - `host_permissions: ['<all_urls>']`：向所有可注入网页注入 content script。
+
+真实 Chromium + unpacked extension smoke 验证已通过 content script 注入、tab list、click、input、file upload、text extraction、table extraction 和受限页错误路径。该 smoke 同时发现 content script 里的 `eval`/`new Function` 会受页面 CSP 限制；用户已批准新增 Chrome `scripting` 权限后，`execute_javascript` 改由 background 调用 `chrome.scripting.executeScript`，只作用于当前目标 tab。
+
+已固化 smoke 脚本：
+
+```bash
+npm run build:ext
+PLAYWRIGHT_REQUIRE_BASE=/private/tmp/page-agent-pw/package.json npm run smoke:ext
+```
+
+常规 smoke 要求 content script、tab list、click、input、upload、text/table extraction 和受限页错误路径全部通过。严格签收命令会把 JS 也纳入强制验收：
+
+```bash
+PLAYWRIGHT_REQUIRE_BASE=/private/tmp/page-agent-pw/package.json npm run smoke:ext -- --require-javascript
+```
+
+`packages/extension/src/agent/manifestPermissions.test.ts` 会守卫当前 manifest 权限集，确保除已批准的 `scripting` 外，`cookies`、`history`、`downloads` 等权限不会被无意加入。
 
 不建议第一版申请 `downloads`、`cookies`、`history`，除非有明确需求。
 
@@ -176,12 +186,12 @@ close_tab
 
 | 能力 | 建议 action | 说明 |
 | --- | --- | --- |
-| 键盘 | `press_key` | 支持 Enter/Escape/Tab/组合键 |
-| hover | `hover_element` | 触发 hover 菜单 |
+| 键盘 | `press_key` | 已支持 Enter/Escape/Tab/组合键 |
+| hover | `hover_element` | 已支持触发 hover 菜单 |
 | 拖拽 | `drag_element` | 后续用于滑块/排序 |
-| 文件上传 | `upload_file` | 需要设计本地文件选择边界 |
-| 页面文本提取 | `extract_page_text` | 比完整 DOM 更适合总结 |
-| 表格提取 | `extract_structured_table` | 管理后台/表格页常用 |
+| 文件上传 | `upload_file` | 已支持用户在 Side Panel 显式选择文件后注入 file input |
+| 页面文本提取 | `extract_page_text` | 已支持归一化页面正文并排除 script/style |
+| 表格提取 | `extract_structured_table` | 已支持首个表格或 indexed element 所属表格 |
 | JS 执行 | `execute_javascript` | Unrestricted Mode 开启，必须有超时和错误回传 |
 
 ## `TabsController` 改造要点
@@ -247,32 +257,33 @@ chrome.tabs.captureVisibleTab(windowId, { format: 'png' })
 
 ### 1. JS 执行
 
-当前扩展版故意未实现 `execute_javascript`，原因是 `AbortSignal` 不能跨 context。Unrestricted Mode 可以实现有限超时版本：
+当前扩展代码已实现 `execute_javascript` 的有限超时和结果截断入口。真实 Chrome smoke 验证显示 content script 方案会被页面 CSP 禁止字符串求值，因此用户批准后改为 `scripting` 权限方案：
 
 ```ts
 async executeJavascript(script: string): Promise<DomActionReturn>
 ```
 
-content script 中执行：
+当前方案：
 
 ```ts
-const timeout = new Promise((_, reject) =>
-  setTimeout(() => reject(new Error('execute_javascript timeout')), 8000)
-)
-const run = Promise.resolve().then(() => {
-  const fn = new Function('return (async () => { ' + script + '\n})()')
-  return fn()
+chrome.scripting.executeScript({
+  target: { tabId },
+  world: 'MAIN',
+  func: async (source) => {
+    const fn = (0, eval)(`(async () => { ${source} })`)
+    return fn()
+  },
+  args: [script],
 })
-const result = await Promise.race([run, timeout])
 ```
 
 返回规则：
 
 - 成功：`{ success: true, message: stringifyPreview(result) }`
 - 报错：`{ success: false, message: error.message }`
-- 结果最大长度建议 4000 字符。
+- 结果最大长度限制为 4000 字符。
 
-注意：这是真正的高危能力。第一版既然开放，也要在 UI、system instruction 和日志里明确是 Unrestricted Mode。
+注意：这是真正的高危能力。当前扩展提供显式设置开关，Side Panel 显示 JavaScript Enabled/Disabled，system instruction 要求优先使用 DOM actions；background 只对当前目标 tab 调用 `chrome.scripting.executeScript`。
 
 ### 2. 键盘
 
@@ -424,9 +435,11 @@ Report exact tab id, page title, and URL when actions span multiple tabs.
 
 1. `RemotePageController` 增加 `executeJavascript`。
 2. content script 增加 `execute_javascript` 实现和超时。
-3. 增加 `press_key`。
-4. 增加 `hover_element`。
+3. 增加 `press_key`。（已完成）
+4. 增加 `hover_element`。（已完成）
 5. 为截图增加 `capture_visible_tab` 工具。
+6. 增加 `extract_page_text` 和 `extract_structured_table`。（已完成）
+7. 增加基于 Side Panel 显式选中文件的 `upload_file`。（已完成）
 
 验收：
 
