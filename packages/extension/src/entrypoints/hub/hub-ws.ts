@@ -166,7 +166,7 @@ export class HubWs {
 		}
 
 		const ok = window.confirm(
-			'An external application is requesting to control your browser via Page Agent Ext.\nAllow this session?'
+			'外部应用正在请求通过 Indofun AIGC 助手控制浏览器。\n是否允许本次会话？'
 		)
 		if (ok) this.#approved = true
 		return ok
@@ -174,7 +174,7 @@ export class HubWs {
 
 	async #handleExecute(msg: ExecuteMessage) {
 		if (this.#busy) {
-			this.#send({ type: 'error', message: 'Hub is busy with another task' })
+			this.#send({ type: 'error', message: '连接中心正在执行另一个任务' })
 			return
 		}
 

@@ -1,11 +1,11 @@
 {
     "extName": {
-        "message": "Page Agent Ext"
+        "message": "Indofun AIGC Assistant"
     },
     "extDescription": {
-        "message": "AI-powered browser automation assistant. Control web pages with natural language."
+        "message": "Indofun AIGC browser assistant for controlled page automation."
     },
     "extActionTitle": {
-        "message": "Open Page Agent"
+        "message": "Open Indofun AIGC Assistant"
     }
 }

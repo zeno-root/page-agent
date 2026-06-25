@@ -17,34 +17,34 @@ const configPanelSource = fs.readFileSync(
 
 describe('unrestricted browser controller side panel surface', () => {
 	it('shows mode, scope, dangerous tools, JavaScript, and current target status', () => {
-		expect(appSource).toContain('Mode: Unrestricted')
-		expect(appSource).toContain('Scope: All accessible pages')
-		expect(appSource).toContain('Dangerous tools: Enabled')
-		expect(appSource).toContain('JavaScript: Disabled')
-		expect(appSource).toContain('Current Target')
-		expect(appSource).toContain('Tab List')
+		expect(appSource).toContain('模式：全页控制')
+		expect(appSource).toContain('范围：可访问页面')
+		expect(appSource).toContain('高风险工具：已启用')
+		expect(appSource).toContain('JavaScript：已关闭')
+		expect(appSource).toContain('当前目标')
+		expect(appSource).toContain('标签页列表')
 		expect(appSource).toContain('setCurrentTargetTab')
 		expect(appSource).toContain('activateTab')
 	})
 
 	it('defaults to current-window tab visibility for unrestricted mode', () => {
 		expect(useAgentSource).toContain('experimentalIncludeAllTabs: true')
-		expect(configPanelSource).toContain('Include all tabs')
+		expect(configPanelSource).toContain('包含所有标签页')
 	})
 
 	it('keeps JavaScript execution explicitly configurable and visible', () => {
 		expect(useAgentSource).toContain('enableJavascriptExecution')
-		expect(configPanelSource).toContain('Enable JavaScript execution')
+		expect(configPanelSource).toContain('允许执行 JavaScript')
 		expect(multiPageAgentSource).toContain(
 			'experimentalScriptExecutionTool: Boolean(config.enableJavascriptExecution)'
 		)
-		expect(appSource).toContain("config?.enableJavascriptExecution ? 'JavaScript: Enabled'")
+		expect(appSource).toContain("config?.enableJavascriptExecution ? 'JavaScript：已启用'")
 	})
 
 	it('requires an explicit side-panel file selection before upload_file can run', () => {
 		expect(appSource).toContain('selectedUploadFileRef')
 		expect(appSource).toContain('handleUploadFileChange')
-		expect(appSource).toContain('Upload file')
+		expect(appSource).toContain('上传文件')
 		expect(multiPageAgentSource).toContain('getSelectedUploadFile')
 	})
 })

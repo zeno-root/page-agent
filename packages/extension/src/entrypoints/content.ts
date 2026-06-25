@@ -1,4 +1,5 @@
 import { initPageController } from '@/agent/RemotePageController.content'
+import { shouldStopContentPolling } from '@/agent/contentRuntimeGuards'
 
 // import { DEMO_CONFIG } from '@/agent/constants'
 
@@ -11,30 +12,39 @@ export default defineContentScript({
 	main() {
 		console.debug(`${DEBUG_PREFIX} Loaded on ${window.location.href}`)
 		initPageController()
-
-		// if auth token matches, expose agent to page
-		chrome.storage.local.get('PageAgentExtUserAuthToken').then((result) => {
-			// extension side token.
-			// @note this is isolated world. it is safe to assume user script cannot access it
-			const extToken = result.PageAgentExtUserAuthToken
-			if (!extToken) return
-
-			// page side token
-			const pageToken = localStorage.getItem('PageAgentExtUserAuthToken')
-			if (!pageToken) return
-
-			if (pageToken !== extToken) return
-
-			console.log('[PageAgentExt]: Auth tokens match. Exposing agent to page.')
-
-			// add isolated world script
-			exposeAgentToPage().then(
-				// add main-world script
-				() => injectScript('/main-world.js')
-			)
-		})
+		void initializePageBridge()
 	},
 })
+
+async function initializePageBridge() {
+	try {
+		// if auth token matches, expose agent to page
+		const result = await chrome.storage.local.get('PageAgentExtUserAuthToken')
+
+		// extension side token.
+		// @note this is isolated world. it is safe to assume user script cannot access it
+		const extToken = result.PageAgentExtUserAuthToken
+		if (!extToken) return
+
+		// page side token
+		const pageToken = localStorage.getItem('PageAgentExtUserAuthToken')
+		if (!pageToken) return
+
+		if (pageToken !== extToken) return
+
+		console.log('[PageAgentExt]: Auth tokens match. Exposing agent to page.')
+
+		// add isolated world script
+		await exposeAgentToPage()
+
+		// add main-world script
+		await injectScript('/main-world.js')
+	} catch (error) {
+		if (!shouldStopContentPolling(error)) {
+			console.warn(`${DEBUG_PREFIX} Failed to initialize page bridge`, error)
+		}
+	}
+}
 
 async function exposeAgentToPage() {
 	const { MultiPageAgent } = await import('@/agent/MultiPageAgent')

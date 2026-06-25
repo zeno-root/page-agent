@@ -24,46 +24,27 @@ export default function App() {
 	const isRunning = status === 'running'
 	const WsIcon = wsState === 'connected' ? PlugZap : wsState === 'connecting' ? Plug : Unplug
 	const wsLabel = {
-		connected: 'Connected',
-		connecting: 'Connecting…',
-		disconnected: new URLSearchParams(location.search).get('ws') ? 'Disconnected' : 'No connection',
+		connected: '已连接',
+		connecting: '连接中...',
+		disconnected: new URLSearchParams(location.search).get('ws') ? '已断开' : '未连接',
 	}[wsState]
 
 	return (
 		<div className="flex h-screen bg-background">
-			{/* Left — Protocol docs */}
+			{/* Left panel */}
 			<aside className="w-80 shrink-0 border-r flex flex-col bg-muted/20">
-				<a
-					href="https://alibaba.github.io/page-agent/"
-					target="_blank"
-					rel="noopener noreferrer"
-					className="flex items-center gap-2 px-5 h-12 border-b hover:bg-muted/30 transition-colors"
-				>
+				<div className="flex items-center gap-2 px-5 h-12 border-b">
 					<Logo className="size-5" />
-					<span className="text-sm font-semibold tracking-tight">Page Agent Hub</span>
+					<span className="text-sm font-semibold tracking-tight">Indofun AIGC 连接中心</span>
 					<span className="text-[9px] font-medium uppercase tracking-wider text-amber-600 bg-amber-500/10 border border-amber-500/30 rounded px-1.5 py-0.5">
 						Beta
 					</span>
-				</a>
+				</div>
 
 				<div className="flex-1 overflow-y-auto px-5 py-4 space-y-6">
 					<div className="text-xs text-muted-foreground leading-relaxed space-y-2">
-						<p>
-							Page Agent Hub lets local apps (e.g. MCP servers) control the Page Agent extension via
-							WebSocket.
-						</p>
-						<p>
-							Check out the official{' '}
-							<a
-								href="https://github.com/alibaba/page-agent/tree/main/packages/mcp"
-								target="_blank"
-								rel="noopener noreferrer"
-								className="underline hover:text-foreground"
-							>
-								MCP server package
-							</a>
-							.
-						</p>
+						<p>连接中心允许本机授权应用通过 WebSocket 调用 Indofun AIGC 助手。</p>
+						<p>默认每次连接都需要你确认，避免外部应用静默接管浏览器。</p>
 					</div>
 
 					<HubConfig />
@@ -73,21 +54,11 @@ export default function App() {
 
 				<div className="border-t px-5 py-3 text-[10px] text-muted-foreground/60 flex items-center justify-between">
 					<span className="font-mono">v{__VERSION__}</span>
-					<span>
-						Built with ♥️ by{' '}
-						<a
-							href="https://github.com/gaomeng1900"
-							target="_blank"
-							rel="noopener noreferrer"
-							className="underline hover:text-foreground"
-						>
-							@Simon
-						</a>
-					</span>
+					<span>Indofun AIGC 浏览器助手</span>
 				</div>
 			</aside>
 
-			{/* Right — Live session */}
+			{/* Right panel */}
 			<main className="flex-1 flex flex-col min-w-0 relative">
 				<MotionOverlay active={isRunning} />
 
@@ -101,7 +72,7 @@ export default function App() {
 						{isRunning && (
 							<Button variant="destructive" size="sm" onClick={stop} className="h-7 text-xs">
 								<Square className="size-3 mr-1" />
-								Stop
+								停止
 							</Button>
 						)}
 					</div>
@@ -111,7 +82,7 @@ export default function App() {
 				{currentTask && (
 					<div className="border-b px-5 py-2 bg-muted/30">
 						<div className="text-[10px] text-muted-foreground uppercase tracking-wide">
-							Current Task
+							当前任务
 						</div>
 						<div className="text-sm font-medium truncate" title={currentTask}>
 							{currentTask}
@@ -125,9 +96,7 @@ export default function App() {
 						<div className="flex flex-col items-center justify-center h-full text-muted-foreground gap-3">
 							<WsIcon className="size-10 opacity-30" />
 							<p className="text-sm">
-								{wsState === 'connected'
-									? 'Waiting for task from external caller…'
-									: 'No active session'}
+								{wsState === 'connected' ? '等待外部调用方下发任务...' : '当前没有活动会话'}
 							</p>
 						</div>
 					)}
@@ -160,13 +129,13 @@ function HubConfig() {
 	return (
 		<div>
 			<h3 className="text-[11px] font-semibold text-foreground/80 uppercase tracking-wider mb-2">
-				Config
+				配置
 			</h3>
 			<div className="group/hub relative">
 				<label
 					className={`flex items-center justify-between p-3 rounded-md border cursor-pointer text-xs ${allowAll ? 'bg-amber-500/10 border-amber-500/30 text-amber-600' : 'bg-muted/50 text-muted-foreground'}`}
 				>
-					Auto-approve connections
+					自动批准连接
 					<Switch
 						checked={allowAll}
 						onCheckedChange={toggle}
@@ -178,10 +147,10 @@ function HubConfig() {
 				<div className="group-hover/hub:visible group-hover/hub:opacity-100 transition-opacity duration-150  left-0 right-0 top-full z-10 pt-2">
 					<div className="relative p-2.5 rounded-md border border-border bg-background/60 backdrop-blur-md shadow-2xl text-muted-foreground text-xs leading-relaxed">
 						<div className="absolute -top-1.5 left-5 size-3 rotate-45 rounded-[1px] border-l border-t border-border bg-background/60 backdrop-blur-md" />
-						By default, each connection requires your approval before running tasks. <br />
-						Enable this to skip per-session approval.
+						默认情况下，每次连接都需要你批准后才会执行任务。 <br />
+						开启后将跳过单次会话确认。
 						<br />
-						<span className="font-semibold">* Use with caution!</span>
+						<span className="font-semibold">* 请谨慎使用。</span>
 					</div>
 				</div>
 			</div>
@@ -199,29 +168,29 @@ function ProtocolDocsCollapsible() {
 				onClick={() => setOpen(!open)}
 				className="flex items-center gap-1 text-[11px] font-semibold text-foreground/80 uppercase tracking-wider cursor-pointer"
 			>
-				Docs
+				协议
 				{open ? <FoldVertical className="size-3" /> : <UnfoldVertical className="size-3" />}
 			</button>
 
 			{open && (
 				<div className="mt-3 space-y-4 text-xs text-muted-foreground">
 					<p className="text-[10px]">
-						Connect via <code className="text-[10px]">hub.html?ws=PORT</code>
+						通过 <code className="text-[10px]">hub.html?ws=PORT</code> 连接
 					</p>
 
 					<section>
-						<h4 className="text-[11px] font-medium text-foreground/60 mb-1.5">Flow</h4>
+						<h4 className="text-[11px] font-medium text-foreground/60 mb-1.5">流程</h4>
 						<ol className="list-decimal list-inside space-y-1 text-[11px] leading-relaxed">
-							<li>Hub opens WS to caller's server</li>
+							<li>连接中心打开调用方服务的 WS 连接</li>
 							<li>
-								Sends <code className="text-[10px]">ready</code>
+								发送 <code className="text-[10px]">ready</code>
 							</li>
 							<li>
-								Caller sends <code className="text-[10px]">execute</code> with task
+								调用方发送带任务的 <code className="text-[10px]">execute</code>
 							</li>
-							<li>Hub runs agent, streams events</li>
+							<li>连接中心运行助手并流式返回事件</li>
 							<li>
-								Hub sends <code className="text-[10px]">result</code> or{' '}
+								连接中心发送 <code className="text-[10px]">result</code> 或{' '}
 								<code className="text-[10px]">error</code>
 							</li>
 						</ol>

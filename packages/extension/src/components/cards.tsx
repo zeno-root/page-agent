@@ -51,7 +51,7 @@ function ResultCard({
 						success ? 'text-green-600 dark:text-green-400' : 'text-destructive'
 					)}
 				>
-					Result: {success ? 'Success' : 'Failed'}
+					结果：{success ? '成功' : '失败'}
 				</span>
 			</div>
 			<p className="text-[12px] text-foreground pl-5 whitespace-pre-wrap">{text}</p>
@@ -137,7 +137,7 @@ function CopyButton({ text, label }: { text: string; label: string }) {
 			}}
 			className="text-[9px] text-muted-foreground hover:text-foreground transition-colors border px-1 rounded shrink-0 cursor-pointer backdrop-blur-xs"
 		>
-			{copied ? 'Copied!' : label}
+			{copied ? '已复制' : label}
 		</button>
 	)
 }
@@ -185,7 +185,7 @@ function RawSection({ rawRequest, rawResponse }: { rawRequest?: unknown; rawResp
 								: 'text-muted-foreground border-transparent hover:text-foreground'
 						)}
 					>
-						Raw Request
+						原始请求
 					</button>
 				)}
 				{rawResponse != null && (
@@ -199,16 +199,16 @@ function RawSection({ rawRequest, rawResponse }: { rawRequest?: unknown; rawResp
 								: 'text-muted-foreground border-transparent hover:text-foreground'
 						)}
 					>
-						Raw Response
+						原始响应
 					</button>
 				)}
 			</div>
 			{content != null && (
 				<div className="relative mt-1.5">
 					<div className="absolute top-1 right-1 flex gap-1">
-						{systemPrompt && <CopyButton text={systemPrompt} label="Copy System" />}
-						{userPrompt && <CopyButton text={userPrompt} label="Copy User" />}
-						<CopyButton text={JSON.stringify(content, null, 4)} label="Copy" />
+						{systemPrompt && <CopyButton text={systemPrompt} label="复制系统" />}
+						{userPrompt && <CopyButton text={userPrompt} label="复制用户" />}
+						<CopyButton text={JSON.stringify(content, null, 4)} label="复制" />
 					</div>
 					<pre className="p-2 pt-5 text-[10px] text-foreground/70 bg-muted rounded overflow-x-auto max-h-60 overflow-y-auto">
 						{JSON.stringify(content, null, 4)}
@@ -223,7 +223,7 @@ function StepCard({ event }: { event: AgentStepEvent }) {
 	return (
 		<div className="rounded-lg border-l-2 border-l-blue-500/50 border bg-muted/40 p-2.5">
 			<div className="text-[11px] font-semibold text-foreground tracking-wide mb-2">
-				Step #{event.stepIndex! + 1}
+				步骤 #{event.stepIndex! + 1}
 			</div>
 
 			{/* Reflection */}
@@ -232,9 +232,7 @@ function StepCard({ event }: { event: AgentStepEvent }) {
 			{/* Action */}
 			{event.action && (
 				<div>
-					<div className="text-[11px] font-semibold text-foreground tracking-wide mb-1">
-						Actions
-					</div>
+					<div className="text-[11px] font-semibold text-foreground tracking-wide mb-1">动作</div>
 					<div className="flex items-start gap-2">
 						<ActionIcon
 							name={event.action.name}

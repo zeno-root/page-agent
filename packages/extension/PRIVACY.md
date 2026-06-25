@@ -1,5 +1,5 @@
-# Privacy Policy for Page Agent Extension
+# Indofun AIGC Assistant Privacy Policy
 
-This document has moved. Please see our full **[Terms of Use & Privacy](../../docs/terms-and-privacy.md)**.
+This extension is packaged for Indofun AIGC browser automation workflows.
 
-Online: https://github.com/alibaba/page-agent/blob/main/docs/terms-and-privacy.md
+The extension performs page analysis and automation locally in the user's browser. Model requests should be routed through the configured Indofun AIGC v1.8 proxy so upstream model credentials remain on the server.

@@ -1,9 +1,8 @@
 import type { LLMConfig } from '@page-agent/llms'
 
-// Demo LLM for testing
-export const DEMO_MODEL = 'qwen3.5-plus'
-export const DEMO_BASE_URL = 'https://page-ag-testing-ohftxirgbn.cn-shanghai.fcapp.run'
-// export const DEMO_API_KEY = 'NA'
+// Fallback values are kept for migration from older local installs.
+export const DEMO_MODEL = 'server-configured'
+export const DEMO_BASE_URL = 'http://localhost:4800/api/page-agent/llm-proxy'
 
 export const DEMO_CONFIG: LLMConfig = {
 	baseURL: DEMO_BASE_URL,
@@ -13,7 +12,7 @@ export const DEMO_CONFIG: LLMConfig = {
 
 export const INDOFUN_V18_PROXY_BASE_URL = 'http://localhost:4800/api/page-agent/llm-proxy'
 export const INDOFUN_V18_PROXY_MODEL = 'server-configured'
-export const INDOFUN_V18_PROXY_API_KEY_LABEL = 'v1.8 Auth Token'
+export const INDOFUN_V18_PROXY_API_KEY_LABEL = 'v1.8 登录 token'
 
 export const INDOFUN_V18_PROXY_CONFIG: LLMConfig = {
 	baseURL: INDOFUN_V18_PROXY_BASE_URL,

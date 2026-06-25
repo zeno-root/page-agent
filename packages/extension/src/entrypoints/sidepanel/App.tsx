@@ -218,9 +218,7 @@ export default function App() {
 			selectedUploadFileRef.current = null
 			setSelectedUploadFileSummary(null)
 			event.currentTarget.value = ''
-			window.alert(
-				`Upload file is too large. Maximum size is ${formatBytes(MAX_UPLOAD_FILE_BYTES)}.`
-			)
+			window.alert(`文件过大，最大支持 ${formatBytes(MAX_UPLOAD_FILE_BYTES)}。`)
 			return
 		}
 
@@ -299,7 +297,7 @@ export default function App() {
 			<header className="flex items-center justify-between border-b px-3 py-2">
 				<div className="flex items-center gap-2">
 					<Logo className="size-5" />
-					<span className="text-sm font-medium">Page Agent Ext</span>
+					<span className="text-sm font-medium">Indofun AIGC 助手</span>
 				</div>
 				<div className="flex items-center gap-1">
 					<StatusDot status={status} />
@@ -308,8 +306,8 @@ export default function App() {
 						size="icon-sm"
 						onClick={() => setView({ name: 'history' })}
 						className="cursor-pointer"
-						aria-label="History"
-						title="History"
+						aria-label="历史记录"
+						title="历史记录"
 					>
 						<History className="size-3.5" />
 					</Button>
@@ -318,8 +316,8 @@ export default function App() {
 						size="icon-sm"
 						onClick={() => setView({ name: 'config' })}
 						className="cursor-pointer"
-						aria-label="Settings"
-						title="Settings"
+						aria-label="设置"
+						title="设置"
 					>
 						<Settings className="size-3.5" />
 					</Button>
@@ -331,7 +329,7 @@ export default function App() {
 				{/* Current task */}
 				{currentTask && (
 					<div className="border-b px-3 py-2 bg-muted/30">
-						<div className="text-[10px] text-muted-foreground uppercase tracking-wide">Task</div>
+						<div className="text-[10px] text-muted-foreground uppercase tracking-wide">任务</div>
 						<div className="text-xs font-medium truncate" title={currentTask}>
 							{currentTask}
 						</div>
@@ -340,21 +338,21 @@ export default function App() {
 
 				<div className="border-b px-3 py-2 bg-muted/20 space-y-2">
 					<div className="grid grid-cols-2 gap-1 text-[10px] text-muted-foreground">
-						<span>Mode: Unrestricted</span>
-						<span>Scope: All accessible pages</span>
-						<span>Dangerous tools: Enabled</span>
+						<span>模式：全页控制</span>
+						<span>范围：可访问页面</span>
+						<span>高风险工具：已启用</span>
 						<span>
-							{config?.enableJavascriptExecution ? 'JavaScript: Enabled' : 'JavaScript: Disabled'}
+							{config?.enableJavascriptExecution ? 'JavaScript：已启用' : 'JavaScript：已关闭'}
 						</span>
 					</div>
 					<div className="text-[11px]">
-						<div className="font-medium">Current Target</div>
+						<div className="font-medium">当前目标</div>
 						<div className="truncate text-muted-foreground" title={currentTarget?.url || ''}>
 							{currentTarget
 								? `[${currentTarget.id}] ${currentTarget.title || '(untitled)'} - ${
 										currentTarget.url || '(url unavailable)'
 									}`
-								: 'No target selected'}
+								: '未选择目标'}
 						</div>
 					</div>
 					<div className="flex items-center gap-1">
@@ -363,10 +361,10 @@ export default function App() {
 							size="sm"
 							className="h-7 text-[11px] cursor-pointer"
 							onClick={() => refreshCurrentTarget().catch(console.error)}
-							title="Refresh tabs"
+							title="刷新标签页"
 						>
 							<RefreshCw className="size-3" />
-							Refresh tabs
+							刷新
 						</Button>
 						<Button
 							variant="outline"
@@ -374,10 +372,10 @@ export default function App() {
 							className="h-7 text-[11px] cursor-pointer"
 							onClick={() => activateCurrentTarget().catch(console.error)}
 							disabled={!currentTarget?.id}
-							title="Activate current target"
+							title="激活当前目标"
 						>
 							<Crosshair className="size-3" />
-							Activate
+							激活
 						</Button>
 						<Button
 							variant="outline"
@@ -385,20 +383,22 @@ export default function App() {
 							className="h-7 text-[11px] cursor-pointer"
 							onClick={() => captureVisibleTab().catch(console.error)}
 							disabled={!currentTarget?.windowId}
-							title="Capture visible tab"
+							title="截取当前可见标签页"
 						>
 							<Camera className="size-3" />
-							Capture
+							截图
 						</Button>
 					</div>
 					<div className="text-[11px] space-y-1">
 						<div className="flex items-center justify-between">
-							<div className="font-medium">Tab List</div>
-							<span className="text-[10px] text-muted-foreground">{visibleTabs.length} tabs</span>
+							<div className="font-medium">标签页列表</div>
+							<span className="text-[10px] text-muted-foreground">
+								{visibleTabs.length} 个标签页
+							</span>
 						</div>
 						<div className="max-h-28 overflow-y-auto rounded-md border bg-background/70 divide-y">
 							{visibleTabs.length === 0 ? (
-								<div className="px-2 py-2 text-muted-foreground">No tabs found</div>
+								<div className="px-2 py-2 text-muted-foreground">没有找到标签页</div>
 							) : (
 								visibleTabs.map((tab) => {
 									const isCurrent = currentTarget?.id === tab.id
@@ -416,10 +416,10 @@ export default function App() {
 												title={tab.url || ''}
 											>
 												<div className="truncate font-medium">
-													[{tab.id}] {tab.title || '(untitled)'}
+													[{tab.id}] {tab.title || '(未命名)'}
 												</div>
 												<div className="truncate text-[10px] text-muted-foreground">
-													{tab.status || 'unknown'} - {tab.url || '(url unavailable)'}
+													{tab.status || 'unknown'} - {tab.url || '(地址不可用)'}
 												</div>
 											</button>
 											<Button
@@ -427,8 +427,8 @@ export default function App() {
 												size="icon-sm"
 												className="size-6 cursor-pointer"
 												onClick={() => activateTab(tab).catch(console.error)}
-												title="Activate tab"
-												aria-label={`Activate tab ${tab.id}`}
+												title="激活标签页"
+												aria-label={`激活标签页 ${tab.id}`}
 											>
 												<Crosshair className="size-3" />
 											</Button>
@@ -468,10 +468,10 @@ export default function App() {
 						className="h-7 text-[11px] cursor-pointer"
 						onClick={() => uploadInputRef.current?.click()}
 						disabled={isRunning}
-						title="Upload file"
+						title="选择上传文件"
 					>
 						<Upload className="size-3" />
-						Upload file
+						上传文件
 					</Button>
 					<div
 						className="min-w-0 flex-1 truncate text-muted-foreground"
@@ -479,7 +479,7 @@ export default function App() {
 					>
 						{selectedUploadFileSummary
 							? `${selectedUploadFileSummary.name} - ${formatBytes(selectedUploadFileSummary.size)}`
-							: 'No upload file selected'}
+							: '未选择上传文件'}
 					</div>
 					{selectedUploadFileSummary && (
 						<Button
@@ -488,8 +488,8 @@ export default function App() {
 							className="size-6 cursor-pointer"
 							onClick={clearUploadFile}
 							disabled={isRunning}
-							title="Clear upload file"
-							aria-label="Clear upload file"
+							title="清除上传文件"
+							aria-label="清除上传文件"
 						>
 							<X className="size-3" />
 						</Button>
@@ -498,7 +498,7 @@ export default function App() {
 				<InputGroup className="relative rounded-lg">
 					<InputGroupTextarea
 						ref={textareaRef}
-						placeholder="Describe your task... (Enter to send)"
+						placeholder="描述要执行的任务...（Enter 发送）"
 						value={inputValue}
 						onChange={(e) => setInputValue(e.target.value)}
 						onKeyDown={handleKeyDown}
@@ -512,8 +512,8 @@ export default function App() {
 								variant="destructive"
 								onClick={handleStop}
 								className="size-7"
-								aria-label="Stop task"
-								title="Stop task"
+								aria-label="停止任务"
+								title="停止任务"
 							>
 								<Square className="size-3" />
 							</InputGroupButton>
@@ -524,8 +524,8 @@ export default function App() {
 								onClick={() => handleSubmit()}
 								disabled={!inputValue.trim()}
 								className="size-7 cursor-pointer"
-								aria-label="Send"
-								title="Send"
+								aria-label="发送"
+								title="发送"
 							>
 								<Send className="size-3" />
 							</InputGroupButton>
@@ -544,9 +544,7 @@ function readFileBase64(file: File): Promise<string> {
 			const result = typeof reader.result === 'string' ? reader.result : ''
 			resolve(result.split(',')[1] || '')
 		})
-		reader.addEventListener('error', () =>
-			reject(reader.error || new Error('Failed to read upload file'))
-		)
+		reader.addEventListener('error', () => reject(reader.error || new Error('读取上传文件失败')))
 		reader.readAsDataURL(file)
 	})
 }

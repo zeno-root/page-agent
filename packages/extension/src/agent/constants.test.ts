@@ -12,7 +12,7 @@ describe('indofun v1.8 proxy config', () => {
 	it('exposes a server-key-safe v1.8 LLM proxy preset', () => {
 		expect(INDOFUN_V18_PROXY_BASE_URL).toBe('http://localhost:4800/api/page-agent/llm-proxy')
 		expect(INDOFUN_V18_PROXY_MODEL).toBe('server-configured')
-		expect(INDOFUN_V18_PROXY_API_KEY_LABEL).toBe('v1.8 Auth Token')
+		expect(INDOFUN_V18_PROXY_API_KEY_LABEL).toBe('v1.8 登录 token')
 		expect(INDOFUN_V18_PROXY_CONFIG).toEqual({
 			baseURL: INDOFUN_V18_PROXY_BASE_URL,
 			model: INDOFUN_V18_PROXY_MODEL,

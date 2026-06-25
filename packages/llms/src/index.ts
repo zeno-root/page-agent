@@ -10,8 +10,7 @@ export function parseLLMConfig(config: LLMConfig): Required<LLMConfig> {
 	// Runtime validation as defensive programming (types already guarantee these)
 	if (!config.baseURL || !config.model) {
 		throw new Error(
-			'[PageAgent] LLM configuration required. Please provide: baseURL, model. ' +
-				'See: https://alibaba.github.io/page-agent/docs/features/models'
+			'[Indofun AIGC] LLM configuration required. Please use the v1.8 proxy config with baseURL and model.'
 		)
 	}
 

@@ -3,6 +3,7 @@
  */
 import { PageController } from '@page-agent/page-controller'
 
+import { shouldStopContentPolling } from './contentRuntimeGuards'
 import {
 	EXECUTE_JAVASCRIPT_MAX_RESULT_LENGTH,
 	EXECUTE_JAVASCRIPT_TIMEOUT_MS,
@@ -34,28 +35,45 @@ export function initPageController() {
 	}
 
 	intervalID = window.setInterval(async () => {
-		const agentHeartbeat = (await chrome.storage.local.get('agentHeartbeat')).agentHeartbeat
-		const now = Date.now()
-		const agentInTouch = typeof agentHeartbeat === 'number' && now - agentHeartbeat < 2_000
+		try {
+			const agentHeartbeat = (await chrome.storage.local.get('agentHeartbeat')).agentHeartbeat
+			const now = Date.now()
+			const agentInTouch = typeof agentHeartbeat === 'number' && now - agentHeartbeat < 2_000
 
-		const isAgentRunning = (await chrome.storage.local.get('isAgentRunning')).isAgentRunning
-		const currentTabId = (await chrome.storage.local.get('currentTabId')).currentTabId
+			const isAgentRunning = (await chrome.storage.local.get('isAgentRunning')).isAgentRunning
+			const currentTabId = (await chrome.storage.local.get('currentTabId')).currentTabId
 
-		const shouldShowMask = isAgentRunning && agentInTouch && currentTabId === (await myTabIdPromise)
+			const shouldShowMask =
+				isAgentRunning && agentInTouch && currentTabId === (await myTabIdPromise)
 
-		if (shouldShowMask) {
-			const pc = getPC()
-			pc.initMask()
-			await pc.showMask()
-		} else {
-			// await getPC().hideMask()
-			if (pageController) {
-				pageController.hideMask()
-				pageController.cleanUpHighlights()
+			if (shouldShowMask) {
+				const pc = getPC()
+				pc.initMask()
+				await pc.showMask()
+			} else {
+				// await getPC().hideMask()
+				if (pageController) {
+					pageController.hideMask()
+					pageController.cleanUpHighlights()
+				}
 			}
-		}
 
-		if (!isAgentRunning && agentInTouch) {
+			if (!isAgentRunning && agentInTouch) {
+				if (pageController) {
+					pageController.dispose()
+					pageController = null
+				}
+			}
+		} catch (error) {
+			if (!shouldStopContentPolling(error)) {
+				console.warn('[RemotePageController.ContentScript]: mask polling failed', error)
+				return
+			}
+
+			if (intervalID !== null) {
+				window.clearInterval(intervalID)
+				intervalID = null
+			}
 			if (pageController) {
 				pageController.dispose()
 				pageController = null

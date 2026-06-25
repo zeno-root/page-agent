@@ -1,11 +1,11 @@
 {
     "extName": {
-        "message": "Page Agent Ext"
+        "message": "Indofun AIGC 助手"
     },
     "extDescription": {
-        "message": "AI 驱动的浏览器自动化助手，用自然语言控制网页。"
+        "message": "Indofun AIGC 浏览器助手，支持受控网页自动化。"
     },
     "extActionTitle": {
-        "message": "打开 Page Agent"
+        "message": "打开 Indofun AIGC 助手"
     }
 }

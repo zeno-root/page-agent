@@ -5,14 +5,10 @@ import {
 	Eye,
 	EyeOff,
 	FoldVertical,
-	HatGlasses,
-	Home,
 	Loader2,
-	Scale,
 	UnfoldVertical,
 } from 'lucide-react'
 import { useEffect, useState } from 'react'
-import { siGithub } from 'simple-icons'
 
 import {
 	DEMO_BASE_URL,
@@ -21,7 +17,6 @@ import {
 	INDOFUN_V18_PROXY_BASE_URL,
 	INDOFUN_V18_PROXY_MODEL,
 	isIndofunV18ProxyEndpoint,
-	isTestingEndpoint,
 } from '@/agent/constants'
 import type { ExtConfig, LanguagePreference } from '@/agent/useAgent'
 import { Button } from '@/components/ui/button'
@@ -137,25 +132,25 @@ export function ConfigPanel({ config, onSave, onClose }: ConfigPanelProps) {
 	return (
 		<div className="flex flex-col gap-4 p-4 relative">
 			<div className="flex items-center justify-between">
-				<h2 className="text-base font-semibold">Settings</h2>
+				<h2 className="text-base font-semibold">设置</h2>
 				<Button
 					variant="ghost"
 					size="icon-sm"
 					onClick={onClose}
 					className="absolute top-2 right-3 cursor-pointer"
-					aria-label="Back"
+					aria-label="返回"
 				>
 					<CornerUpLeft className="size-3.5" />
 				</Button>
 			</div>
 
-			{/* User Auth Token Section */}
+			{/* User auth token */}
 			<div className="flex flex-col gap-1.5 p-3 bg-muted/50 rounded-md border">
 				<label htmlFor="user-auth-token" className="text-xs font-medium text-muted-foreground">
-					User Auth Token
+					用户授权 token
 				</label>
 				<p className="text-[10px] text-muted-foreground mb-1">
-					Give a website the ability to call this extension.
+					用于授权 Indofun AIGC 页面调用本扩展。
 				</p>
 				<div className="flex gap-2 items-center">
 					<Input
@@ -166,7 +161,7 @@ export function ConfigPanel({ config, onSave, onClose }: ConfigPanelProps) {
 								? showToken
 									? userAuthToken
 									: `${userAuthToken.slice(0, 4)}${'•'.repeat(userAuthToken.length - 8)}${userAuthToken.slice(-4)}`
-								: 'Loading...'
+								: '加载中...'
 						}
 						className="text-xs h-8 font-mono bg-background"
 					/>
@@ -176,7 +171,7 @@ export function ConfigPanel({ config, onSave, onClose }: ConfigPanelProps) {
 						className="h-8 w-8 shrink-0 cursor-pointer"
 						onClick={() => setShowToken(!showToken)}
 						disabled={!userAuthToken}
-						aria-label={showToken ? 'Hide token' : 'Show token'}
+						aria-label={showToken ? '隐藏 token' : '显示 token'}
 						aria-pressed={showToken}
 					>
 						{showToken ? <EyeOff className="size-3" /> : <Eye className="size-3" />}
@@ -187,12 +182,12 @@ export function ConfigPanel({ config, onSave, onClose }: ConfigPanelProps) {
 						className="h-8 w-8 shrink-0 cursor-pointer"
 						onClick={handleCopyToken}
 						disabled={!userAuthToken}
-						aria-label="Copy token"
+						aria-label="复制 token"
 					>
 						{copied ? <span className="">✓</span> : <Copy className="size-3" />}
 					</Button>
 					<span role="status" aria-live="polite" aria-atomic="true" className="sr-only">
-						{copied ? 'Token copied' : ''}
+						{copied ? 'token 已复制' : ''}
 					</span>
 				</div>
 			</div>
@@ -204,17 +199,17 @@ export function ConfigPanel({ config, onSave, onClose }: ConfigPanelProps) {
 				rel="noopener noreferrer"
 				className="flex items-center justify-between p-3 rounded-md border bg-muted/50 text-xs font-medium text-muted-foreground hover:text-foreground hover:border-foreground/20 transition-colors"
 			>
-				Manage Page Agent Hub
+				打开 Indofun AIGC 连接中心
 				<ExternalLink className="size-3" />
 			</a>
 
 			<div className="flex flex-col gap-1.5">
 				<label htmlFor="base-url" className="text-xs text-muted-foreground">
-					Base URL
+					服务地址
 				</label>
 				<Input
 					id="base-url"
-					placeholder="https://api.openai.com/v1"
+					placeholder="http://localhost:4800/api/page-agent/llm-proxy"
 					value={baseURL}
 					onChange={(e) => setBaseURL(e.target.value)}
 					className="text-xs h-8"
@@ -227,34 +222,18 @@ export function ConfigPanel({ config, onSave, onClose }: ConfigPanelProps) {
 				className="h-8 text-xs cursor-pointer"
 				onClick={applyIndofunV18Proxy}
 			>
-				Use v1.8 proxy
+				使用 v1.8 代理
 			</Button>
-
-			{/* Testing API notice */}
-			{isTestingEndpoint(baseURL) && (
-				<div className="p-2.5 rounded-md border border-amber-500/30 bg-amber-500/5 text-[11px] text-muted-foreground leading-relaxed">
-					<Scale className="size-3 inline-block mr-1 -mt-0.5 text-amber-600" />
-					You are using our testing API. By using this you agree to the{' '}
-					<a
-						href="https://github.com/alibaba/page-agent/blob/main/docs/terms-and-privacy.md"
-						target="_blank"
-						rel="noopener noreferrer"
-						className="underline hover:text-foreground"
-					>
-						Terms of Use & Privacy Policy
-					</a>
-				</div>
-			)}
 
 			{usingIndofunV18Proxy && (
 				<div className="p-2.5 rounded-md border border-emerald-500/30 bg-emerald-500/5 text-[11px] text-muted-foreground leading-relaxed">
-					v1.8 proxy keeps the real LLM key on the server. Paste your v1.8 login token below.
+					v1.8 代理会把真实模型 Key 保留在服务端。请在下方粘贴当前登录 token。
 				</div>
 			)}
 
 			<div className="flex flex-col gap-1.5">
 				<label htmlFor="model" className="text-xs text-muted-foreground">
-					Model
+					模型
 				</label>
 				<Input
 					id="model"
@@ -273,7 +252,7 @@ export function ConfigPanel({ config, onSave, onClose }: ConfigPanelProps) {
 					<Input
 						id="api-key"
 						type={showApiKey ? 'text' : 'password'}
-						placeholder={usingIndofunV18Proxy ? 'Paste v1.8 login token' : 'sk-...'}
+						placeholder={usingIndofunV18Proxy ? '粘贴 v1.8 登录 token' : 'sk-...'}
 						value={apiKey}
 						onChange={(e) => setApiKey(e.target.value)}
 						className="text-xs h-8"
@@ -283,7 +262,7 @@ export function ConfigPanel({ config, onSave, onClose }: ConfigPanelProps) {
 						size="icon"
 						className="h-8 w-8 shrink-0 cursor-pointer"
 						onClick={() => setShowApiKey(!showApiKey)}
-						aria-label={showApiKey ? 'Hide API key' : 'Show API key'}
+						aria-label={showApiKey ? '隐藏密钥' : '显示密钥'}
 					>
 						{showApiKey ? <EyeOff className="size-3" /> : <Eye className="size-3" />}
 					</Button>
@@ -291,13 +270,13 @@ export function ConfigPanel({ config, onSave, onClose }: ConfigPanelProps) {
 			</div>
 
 			<div className="flex flex-col gap-1.5">
-				<label className="text-xs text-muted-foreground">Response Language</label>
+				<label className="text-xs text-muted-foreground">回复语言</label>
 				<select
 					value={language ?? ''}
 					onChange={(e) => setLanguage((e.target.value || undefined) as LanguagePreference)}
 					className="h-8 text-xs rounded-md border border-input bg-background px-2 cursor-pointer"
 				>
-					<option value="">System</option>
+					<option value="">跟随系统</option>
 					<option value="en-US">English</option>
 					<option value="zh-CN">中文</option>
 				</select>
@@ -309,7 +288,7 @@ export function ConfigPanel({ config, onSave, onClose }: ConfigPanelProps) {
 				onClick={() => setAdvancedOpen(!advancedOpen)}
 				className="flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground cursor-pointer mt-1 font-bold"
 			>
-				Advanced
+				高级设置
 				{advancedOpen ? <FoldVertical className="size-3" /> : <UnfoldVertical className="size-3" />}
 			</button>
 
@@ -317,7 +296,7 @@ export function ConfigPanel({ config, onSave, onClose }: ConfigPanelProps) {
 				<>
 					<div className="flex flex-col gap-1.5">
 						<label htmlFor="max-steps" className="text-xs text-muted-foreground">
-							Max Steps
+							最大步数
 						</label>
 						<Input
 							id="max-steps"
@@ -332,9 +311,9 @@ export function ConfigPanel({ config, onSave, onClose }: ConfigPanelProps) {
 					</div>
 
 					<div className="flex flex-col gap-1.5">
-						<label className="text-xs text-muted-foreground">System Instruction</label>
+						<label className="text-xs text-muted-foreground">系统补充指令</label>
 						<textarea
-							placeholder="Additional instructions for the agent..."
+							placeholder="给助手补充额外执行要求..."
 							value={systemInstruction}
 							onChange={(e) => setSystemInstruction(e.target.value)}
 							rows={3}
@@ -343,17 +322,17 @@ export function ConfigPanel({ config, onSave, onClose }: ConfigPanelProps) {
 					</div>
 
 					<label className="flex items-center justify-between cursor-pointer">
-						<span className="text-xs text-muted-foreground">Disable named tool_choice</span>
+						<span className="text-xs text-muted-foreground">禁用指定工具选择</span>
 						<Switch checked={disableNamedToolChoice} onCheckedChange={setDisableNamedToolChoice} />
 					</label>
 
 					<label className="flex items-center justify-between cursor-pointer">
-						<span className="text-xs text-muted-foreground">Experimental llms.txt support</span>
+						<span className="text-xs text-muted-foreground">启用 llms.txt 实验支持</span>
 						<Switch checked={experimentalLlmsTxt} onCheckedChange={setExperimentalLlmsTxt} />
 					</label>
 
 					<label className="flex items-center justify-between cursor-pointer">
-						<span className="text-xs text-muted-foreground">Include all tabs</span>
+						<span className="text-xs text-muted-foreground">包含所有标签页</span>
 						<Switch
 							checked={experimentalIncludeAllTabs}
 							onCheckedChange={setExperimentalIncludeAllTabs}
@@ -361,7 +340,7 @@ export function ConfigPanel({ config, onSave, onClose }: ConfigPanelProps) {
 					</label>
 
 					<label className="flex items-center justify-between cursor-pointer">
-						<span className="text-xs text-muted-foreground">Enable JavaScript execution</span>
+						<span className="text-xs text-muted-foreground">允许执行 JavaScript</span>
 						<Switch
 							checked={enableJavascriptExecution}
 							onCheckedChange={setEnableJavascriptExecution}
@@ -372,72 +351,22 @@ export function ConfigPanel({ config, onSave, onClose }: ConfigPanelProps) {
 
 			<div className="flex gap-2 mt-2">
 				<Button variant="outline" onClick={onClose} className="flex-1 h-8 text-xs cursor-pointer">
-					Cancel
+					取消
 				</Button>
 				<Button
 					onClick={handleSave}
 					disabled={saving}
 					className="flex-1 h-8 text-xs cursor-pointer"
 				>
-					{saving ? <Loader2 className="size-3 animate-spin" /> : 'Save'}
+					{saving ? <Loader2 className="size-3 animate-spin" /> : '保存'}
 				</Button>
 			</div>
 
 			{/* Footer */}
-			<div className="mt-4 mb-4 pt-4 border-t border-border/50 flex gap-2 justify-between text-[10px] text-muted-foreground">
-				<div className="flex flex-col justify-between">
-					<span>
-						Version <span className="font-mono">v{__VERSION__}</span>
-					</span>
-
-					<a
-						href="https://github.com/alibaba/page-agent"
-						target="_blank"
-						rel="noopener noreferrer"
-						className="flex items-center gap-1 hover:text-foreground"
-					>
-						<svg role="img" viewBox="0 0 24 24" className="size-3 fill-current">
-							<path d={siGithub.path} />
-						</svg>
-						<span>Source Code</span>
-					</a>
-				</div>
-
-				<div className="flex flex-col items-end">
-					<a
-						href="https://alibaba.github.io/page-agent/"
-						target="_blank"
-						rel="noopener noreferrer"
-						className="flex items-center gap-1 hover:text-foreground"
-					>
-						<Home className="size-3" />
-						<span>Home Page</span>
-					</a>
-
-					<a
-						href="https://github.com/alibaba/page-agent/blob/main/docs/terms-and-privacy.md"
-						target="_blank"
-						rel="noopener noreferrer"
-						className="flex items-center gap-1 hover:text-foreground"
-					>
-						<HatGlasses className="size-3" />
-						<span>Privacy</span>
-					</a>
-				</div>
-			</div>
-
-			{/* attribute */}
-			<div className="text-[10px] text-muted-foreground bg-background fixed bottom-0 w-full flex justify-around">
-				<span className="leading-loose">
-					Built with ♥️ by{' '}
-					<a
-						href="https://github.com/gaomeng1900"
-						target="_blank"
-						rel="noopener noreferrer"
-						className="underline hover:text-foreground"
-					>
-						@Simon
-					</a>
+			<div className="mt-4 mb-4 pt-4 border-t border-border/50 flex justify-between text-[10px] text-muted-foreground">
+				<span>Indofun AIGC 浏览器助手</span>
+				<span>
+					版本 <span className="font-mono">v{__VERSION__}</span>
 				</span>
 			</div>
 		</div>

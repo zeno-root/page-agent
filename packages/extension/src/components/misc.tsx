@@ -1,8 +1,6 @@
 import type { AgentStatus } from '@page-agent/core'
 import { Motion } from 'ai-motion'
-import { BookOpen, Globe } from 'lucide-react'
 import { useEffect, useRef } from 'react'
-import { siGithub } from 'simple-icons'
 
 import { TypingAnimation } from '@/components/ui/typing-animation'
 import { cn } from '@/lib/utils'
@@ -18,11 +16,11 @@ export function StatusDot({ status }: { status: AgentStatus }) {
 	}[status]
 
 	const label = {
-		idle: 'Ready',
-		running: 'Running',
-		completed: 'Done',
-		error: 'Error',
-		stopped: 'Stopped',
+		idle: '就绪',
+		running: '运行中',
+		completed: '已完成',
+		error: '错误',
+		stopped: '已停止',
 	}[status]
 
 	return (
@@ -36,7 +34,7 @@ export function StatusDot({ status }: { status: AgentStatus }) {
 }
 
 export function Logo({ className }: { className?: string }) {
-	return <img src="/assets/page-agent-256.webp" alt="Page Agent" className={cn('', className)} />
+	return <img src="/assets/indofun-aigc-256.png" alt="Indofun AIGC" className={cn('', className)} />
 }
 
 // Full-screen ai-motion glow overlay, shown only while running
@@ -97,19 +95,17 @@ export function EmptyState() {
 	return (
 		<div className="flex flex-col items-center justify-center h-full gap-4 text-center px-6">
 			<div className="relative select-none pointer-events-none">
-				<div className="absolute inset-0 -m-6 rounded-full bg-[conic-gradient(from_180deg,oklch(0.55_0.2_280),oklch(0.5_0.15_230),oklch(0.6_0.18_310),oklch(0.55_0.2_280))] blur-2xl animate-[glow-a_5s_ease-in-out_infinite]" />
-				<div className="absolute inset-0 -m-6 rounded-full bg-[conic-gradient(from_0deg,oklch(0.55_0.18_160),oklch(0.5_0.2_200),oklch(0.6_0.15_120),oklch(0.55_0.18_160))] blur-2xl animate-[glow-b_5s_ease-in-out_infinite]" />
-				<Logo className="relative size-20 opacity-80" />
+				<Logo className="relative w-32 h-20 object-contain opacity-90" />
 			</div>
 			<div>
-				<h2 className="text-base font-medium text-foreground mb-1">Page Agent Ext</h2>
+				<h2 className="text-base font-medium text-foreground mb-1">Indofun AIGC 助手</h2>
 				<TypingAnimation
 					className="text-sm text-muted-foreground"
 					words={[
-						'Enter a task to automate this page',
-						'Execute multi-page tasks',
-						'Call this extension from your web page',
-						'Use this extension in your own agents',
+						'输入任务，自动操作当前页面',
+						'支持跨标签页执行任务',
+						'连接 Indofun AIGC v1.8 代理',
+						'真实模型 Key 保留在服务端',
 					]}
 					cursorStyle="underscore"
 					loop
@@ -119,37 +115,7 @@ export function EmptyState() {
 					pauseDelay={3000}
 				/>
 			</div>
-			<div className="flex items-center gap-3 mt-1 text-muted-foreground">
-				<a
-					href="https://github.com/alibaba/page-agent"
-					target="_blank"
-					rel="noopener noreferrer"
-					className="hover:text-foreground transition-colors"
-					title="GitHub"
-				>
-					<svg role="img" viewBox="0 0 24 24" className="size-4 fill-current">
-						<path d={siGithub.path} />
-					</svg>
-				</a>
-				<a
-					href="https://alibaba.github.io/page-agent/docs/features/chrome-extension"
-					target="_blank"
-					rel="noopener noreferrer"
-					className="hover:text-foreground transition-colors"
-					title="Documentation"
-				>
-					<BookOpen className="size-4" />
-				</a>
-				<a
-					href="https://alibaba.github.io/page-agent"
-					target="_blank"
-					rel="noopener noreferrer"
-					className="hover:text-foreground transition-colors"
-					title="Website"
-				>
-					<Globe className="size-4" />
-				</a>
-			</div>
+			<div className="mt-1 text-[11px] text-muted-foreground">仅处理你授权的浏览器页面任务</div>
 		</div>
 	)
 }
