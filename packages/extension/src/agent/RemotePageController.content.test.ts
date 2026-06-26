@@ -7,6 +7,8 @@ const pageControllerState = vi.hoisted(() => ({
 	instances: [] as { disposed: boolean }[],
 	throwOnConstruct: false,
 	throwOnDispose: false,
+	rejectOnDispose: false,
+	rejectOnHideMask: false,
 }))
 
 vi.mock('@page-agent/page-controller', () => {
@@ -24,13 +26,20 @@ vi.mock('@page-agent/page-controller', () => {
 
 		async showMask() {}
 
-		hideMask() {}
+		async hideMask() {
+			if (pageControllerState.rejectOnHideMask) {
+				throw new Error("Cannot read properties of undefined (reading 'local')")
+			}
+		}
 
-		cleanUpHighlights() {}
+		async cleanUpHighlights() {}
 
 		dispose() {
 			if (pageControllerState.throwOnDispose) {
 				throw new Error('Extension context invalidated.')
+			}
+			if (pageControllerState.rejectOnDispose) {
+				return Promise.reject(new Error('Extension context invalidated.'))
 			}
 			this.disposed = true
 		}
@@ -85,6 +94,8 @@ describe('RemotePageController content script runtime guards', () => {
 		pageControllerState.instances = []
 		pageControllerState.throwOnConstruct = false
 		pageControllerState.throwOnDispose = false
+		pageControllerState.rejectOnDispose = false
+		pageControllerState.rejectOnHideMask = false
 	})
 
 	it('skips startup when extension runtime APIs are unavailable', () => {
@@ -125,6 +136,46 @@ describe('RemotePageController content script runtime guards', () => {
 
 		chromeMock.get.mockRejectedValueOnce(new Error('Extension context invalidated.'))
 		pageControllerState.throwOnDispose = true
+
+		await expect(vi.advanceTimersByTimeAsync(500)).resolves.toBeDefined()
+	})
+
+	it('swallows async context invalidation while disposing a stale page controller', async () => {
+		vi.useFakeTimers()
+		const chromeMock = installChromeMock()
+		initPageController()
+
+		const sendResponse = vi.fn()
+		chromeMock.listener?.({ type: 'PAGE_CONTROL', action: 'get_browser_state' }, {}, sendResponse)
+		await Promise.resolve()
+		expect(pageControllerState.instances).toHaveLength(1)
+
+		chromeMock.get.mockRejectedValueOnce(new Error('Extension context invalidated.'))
+		pageControllerState.rejectOnDispose = true
+
+		await expect(vi.advanceTimersByTimeAsync(500)).resolves.toBeDefined()
+		await Promise.resolve()
+	})
+
+	it('stops polling when async mask cleanup sees invalidated storage', async () => {
+		vi.useFakeTimers()
+		const chromeMock = installChromeMock()
+		initPageController()
+
+		const sendResponse = vi.fn()
+		chromeMock.listener?.({ type: 'PAGE_CONTROL', action: 'get_browser_state' }, {}, sendResponse)
+		await Promise.resolve()
+		expect(pageControllerState.instances).toHaveLength(1)
+
+		chromeMock.get.mockImplementation(async (key: string) => {
+			const values: Record<string, unknown> = {
+				agentHeartbeat: Date.now(),
+				currentTabId: 7,
+				isAgentRunning: false,
+			}
+			return { [key]: values[key] }
+		})
+		pageControllerState.rejectOnHideMask = true
 
 		await expect(vi.advanceTimersByTimeAsync(500)).resolves.toBeDefined()
 	})

@@ -29,7 +29,17 @@ export function initPageController() {
 			const controller = pageController
 			pageController = null
 			try {
-				controller.dispose()
+				const disposeResult = controller.dispose() as unknown
+				if (isPromiseLike(disposeResult)) {
+					disposeResult.catch((error) => {
+						if (!shouldStopContentPolling(error)) {
+							console.warn(
+								'[RemotePageController.ContentScript]: failed to dispose controller',
+								error
+							)
+						}
+					})
+				}
 			} catch (error) {
 				if (!shouldStopContentPolling(error)) {
 					console.warn('[RemotePageController.ContentScript]: failed to dispose controller', error)
@@ -101,8 +111,8 @@ export function initPageController() {
 			} else {
 				// await getPC().hideMask()
 				if (pageController) {
-					pageController.hideMask()
-					pageController.cleanUpHighlights()
+					await pageController.hideMask()
+					await pageController.cleanUpHighlights()
 				}
 			}
 
@@ -201,6 +211,17 @@ function getChromeStorageLocal(): chrome.storage.StorageArea | null {
 	const storageLocal = chrome.storage?.local
 	if (!storageLocal || typeof storageLocal.get !== 'function') return null
 	return storageLocal
+}
+
+function isPromiseLike(
+	value: unknown
+): value is PromiseLike<unknown> & { catch: Promise<unknown>['catch'] } {
+	return (
+		!!value &&
+		typeof value === 'object' &&
+		typeof (value as PromiseLike<unknown>).then === 'function' &&
+		typeof (value as { catch?: unknown }).catch === 'function'
+	)
 }
 
 function getErrorMessage(error: unknown): string {

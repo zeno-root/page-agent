@@ -19,7 +19,9 @@ export default defineContentScript({
 async function initializePageBridge() {
 	try {
 		// if auth token matches, expose agent to page
-		const result = await chrome.storage.local.get('PageAgentExtUserAuthToken')
+		const storageLocal = getChromeStorageLocal()
+		if (!storageLocal) return
+		const result = await storageLocal.get('PageAgentExtUserAuthToken')
 
 		// extension side token.
 		// @note this is isolated world. it is safe to assume user script cannot access it
@@ -44,6 +46,13 @@ async function initializePageBridge() {
 			console.warn(`${DEBUG_PREFIX} Failed to initialize page bridge`, error)
 		}
 	}
+}
+
+function getChromeStorageLocal(): chrome.storage.StorageArea | null {
+	if (typeof chrome === 'undefined') return null
+	const storageLocal = chrome.storage?.local
+	if (!storageLocal || typeof storageLocal.get !== 'function') return null
+	return storageLocal
 }
 
 async function exposeAgentToPage() {
