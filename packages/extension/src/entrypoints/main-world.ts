@@ -29,6 +29,7 @@ export interface ExecuteConfig {
 
 export default defineUnlistedScript(() => {
 	let _lastId = 0
+	const targetOrigin = pageMessageTargetOrigin()
 	function getId() {
 		_lastId += 1
 		return _lastId
@@ -103,7 +104,7 @@ export default defineUnlistedScript(() => {
 					},
 				},
 			},
-			'*'
+			targetOrigin
 		)
 
 		return promise
@@ -118,7 +119,7 @@ export default defineUnlistedScript(() => {
 				id,
 				action: 'stop',
 			},
-			'*'
+			targetOrigin
 		)
 	}
 
@@ -129,3 +130,8 @@ export default defineUnlistedScript(() => {
 		stop,
 	}
 })
+
+function pageMessageTargetOrigin(): string {
+	const origin = window.location.origin
+	return origin && origin !== 'null' ? origin : '*'
+}

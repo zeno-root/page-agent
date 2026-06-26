@@ -18,7 +18,7 @@ export function handleTabControlMessage(
 		case 'get_active_tab': {
 			debug('get_active_tab')
 			chrome.tabs
-				.query({ active: true })
+				.query({ active: true, lastFocusedWindow: true })
 				.then((tabs) => {
 					debug('get_active_tab: success', tabs)
 					sendResponse({ success: true, tab: tabs[0] })
@@ -139,7 +139,7 @@ export function handleTabControlMessage(
 					sendResponse({ success: true, groupId })
 				})
 				.catch((error) => {
-					console.error(PREFIX, 'Failed to create tab group', error)
+					console.warn(PREFIX, 'Failed to create tab group', error)
 					sendResponse({ error: error instanceof Error ? error.message : String(error) })
 				})
 			return true // async response

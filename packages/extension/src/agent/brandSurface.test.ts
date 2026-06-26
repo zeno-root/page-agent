@@ -39,7 +39,7 @@ const releaseSurfaceSource = [
 describe('indofun extension brand surface', () => {
 	it('publishes the Chrome extension under Indofun AIGC branding', () => {
 		expect(wxtConfigSource).toContain("default_locale: 'zh_CN'")
-		expect(wxtConfigSource).toContain("homepage_url: 'https://aigc.indofun.com/'")
+		expect(wxtConfigSource).toContain("homepage_url: 'https://indofun.ai/'")
 		expect(wxtConfigSource).toContain(
 			"artifactTemplate: 'indofun-aigc-assistant-{{version}}-{{browser}}.zip'"
 		)

@@ -26,6 +26,7 @@ export class TabsController {
 	private disposed = false
 	private port?: chrome.runtime.Port
 	private portRetries = 0
+	private reconnectTimer: ReturnType<typeof globalThis.setTimeout> | null = null
 
 	private windowId: number | null = null
 	private tabs: TabMeta[] = []
@@ -47,6 +48,7 @@ export class TabsController {
 		this.disposed = false
 		this.port = undefined
 		this.portRetries = 0
+		this.clearReconnectTimer()
 
 		this.windowId = null
 		this.tabs = []
@@ -429,13 +431,14 @@ export class TabsController {
 	 *
 	 * @note Port is 1:1 (runtime.connect → background SW has no frames),
 	 * so onDisconnect fires exactly once and we can safely reconnect.
-	 * Reconnection may miss events during the gap.
-	 * TODO: refresh this.tabs from background after reconnect to stay consistent.
 	 */
 	private connectTabEvents() {
-		this.port = chrome.runtime.connect({ name: 'tab-events' })
+		this.clearReconnectTimer()
 
-		this.port.onMessage.addListener((message: any) => {
+		const port = chrome.runtime.connect({ name: 'tab-events' })
+		this.port = port
+
+		port.onMessage.addListener((message: any) => {
 			if (this.disposed) return
 			this.portRetries = 0
 
@@ -471,24 +474,74 @@ export class TabsController {
 			}
 		})
 
-		this.port.onDisconnect.addListener(() => {
-			this.port = undefined
+		port.onDisconnect.addListener(() => {
+			if (this.port === port) this.port = undefined
 			if (this.disposed) return
 			if (this.portRetries >= 7) {
-				console.error(PREFIX, 'tab events port failed after 7 retries, giving up')
+				console.warn(PREFIX, 'tab events port failed after 7 retries, giving up')
 				return
 			}
-			debug('port disconnected, reconnecting...')
+			const delayMs = Math.min(2_000, 100 * 2 ** this.portRetries)
+			debug('port disconnected, reconnecting...', { delayMs })
 			this.portRetries++
-			this.connectTabEvents()
+			this.reconnectTimer = globalThis.setTimeout(() => {
+				this.reconnectTimer = null
+				if (this.disposed) return
+				this.connectTabEvents()
+				void this.refreshTrackedTabs()
+			}, delayMs)
 		})
 	}
 
 	dispose() {
 		debug('dispose')
 		this.disposed = true
+		this.clearReconnectTimer()
 		this.port?.disconnect()
 		this.port = undefined
+	}
+
+	private clearReconnectTimer() {
+		if (this.reconnectTimer !== null) {
+			globalThis.clearTimeout(this.reconnectTimer)
+			this.reconnectTimer = null
+		}
+	}
+
+	private async refreshTrackedTabs() {
+		if (!this.windowId || this.tabs.length === 0) return
+
+		try {
+			const result = await sendMessage({
+				type: 'TAB_CONTROL',
+				action: 'get_window_tabs',
+				payload: { windowId: this.windowId },
+			})
+			if (!Array.isArray(result?.tabs)) return
+
+			const latestTabs = new Map<number, chrome.tabs.Tab>()
+			for (const tab of result.tabs as chrome.tabs.Tab[]) {
+				if (tab.id != null) latestTabs.set(tab.id, tab)
+			}
+
+			this.tabs = this.tabs
+				.filter((tab) => latestTabs.has(tab.id))
+				.map((tab) => {
+					const latest = latestTabs.get(tab.id)
+					return {
+						...tab,
+						url: latest?.url ?? tab.url,
+						title: latest?.title ?? tab.title,
+						status: latest?.status ?? tab.status,
+					}
+				})
+
+			if (this.currentTabId != null && !this.tabs.some((tab) => tab.id === this.currentTabId)) {
+				await this.updateCurrentTabId(this.tabs.at(-1)?.id ?? null)
+			}
+		} catch (error) {
+			console.warn(PREFIX, 'failed to refresh tracked tabs after reconnect', error)
+		}
 	}
 
 	private resolveTabId(tabId?: number): number {

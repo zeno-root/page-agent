@@ -64,6 +64,7 @@ function getChromeStorageLocal(): chrome.storage.StorageArea | null {
 async function exposeAgentToPage() {
 	const { MultiPageAgent } = await import('@/agent/MultiPageAgent')
 	console.log('[PageAgentExt]: MultiPageAgent loaded')
+	const targetOrigin = pageMessageTargetOrigin()
 
 	/**
 	 * singleton MultiPageAgent to handle requests from the page
@@ -90,7 +91,7 @@ async function exposeAgentToPage() {
 							action: 'execute_result',
 							error: 'Agent is already running a task. Please wait until it finishes.',
 						},
-						'*'
+						targetOrigin
 					)
 					return
 				}
@@ -118,7 +119,7 @@ async function exposeAgentToPage() {
 								action: 'status_change_event',
 								payload: multiPageAgent.status,
 							},
-							'*'
+							targetOrigin
 						)
 					})
 
@@ -131,7 +132,7 @@ async function exposeAgentToPage() {
 								action: 'activity_event',
 								payload: (event as CustomEvent).detail,
 							},
-							'*'
+							targetOrigin
 						)
 					})
 
@@ -144,7 +145,7 @@ async function exposeAgentToPage() {
 								action: 'history_change_event',
 								payload: multiPageAgent.history,
 							},
-							'*'
+							targetOrigin
 						)
 					})
 
@@ -159,7 +160,7 @@ async function exposeAgentToPage() {
 							action: 'execute_result',
 							payload: result,
 						},
-						'*'
+						targetOrigin
 					)
 				} catch (error) {
 					window.postMessage(
@@ -169,7 +170,7 @@ async function exposeAgentToPage() {
 							action: 'execute_result',
 							error: getContentRuntimeErrorMessage(error),
 						},
-						'*'
+						targetOrigin
 					)
 				}
 
@@ -186,4 +187,9 @@ async function exposeAgentToPage() {
 				break
 		}
 	})
+}
+
+function pageMessageTargetOrigin(): string {
+	const origin = window.location.origin
+	return origin && origin !== 'null' ? origin : '*'
 }

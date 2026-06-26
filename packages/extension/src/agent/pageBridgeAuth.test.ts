@@ -27,21 +27,49 @@ describe('content script page bridge authorization', () => {
 		).toBe(true)
 		expect(
 			shouldExposePageBridge({
-				href: 'https://aigc.indofun.ai/',
+				href: 'https://indofun.ai:3333/',
 				extensionToken: 'extension-token',
 				pageToken: null,
 			})
 		).toBe(true)
+		expect(
+			shouldExposePageBridge({
+				href: 'https://www.indofun.ai/',
+				extensionToken: 'extension-token',
+				pageToken: null,
+			})
+		).toBe(true)
+		expect(
+			shouldExposePageBridge({
+				href: 'https://api.indofun.ai/',
+				extensionToken: 'extension-token',
+				pageToken: null,
+			})
+		).toBe(true)
+		expect(
+			shouldExposePageBridge({
+				href: 'https://aigc.indofun.ai/',
+				extensionToken: 'extension-token',
+				pageToken: null,
+			})
+		).toBe(false)
 		expect(
 			shouldExposePageBridge({
 				href: 'https://staging.aigc.indofun.ai/',
 				extensionToken: 'extension-token',
 				pageToken: null,
 			})
-		).toBe(true)
+		).toBe(false)
 		expect(
 			shouldExposePageBridge({
 				href: 'https://aigc.indofun.com/',
+				extensionToken: 'extension-token',
+				pageToken: null,
+			})
+		).toBe(false)
+		expect(
+			shouldExposePageBridge({
+				href: 'https://other.indofun.com/',
 				extensionToken: 'extension-token',
 				pageToken: null,
 			})

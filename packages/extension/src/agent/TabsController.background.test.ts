@@ -4,11 +4,13 @@ import { handleTabControlMessage } from './TabsController.background'
 
 function installChromeMock(overrides: Partial<typeof chrome.tabs> = {}) {
 	const tabs = {
+		query: vi.fn().mockResolvedValue([{ id: 7, windowId: 3 }]),
 		update: vi.fn().mockResolvedValue({ id: 7 }),
 		reload: vi.fn().mockResolvedValue(undefined),
 		goBack: vi.fn().mockResolvedValue(undefined),
 		goForward: vi.fn().mockResolvedValue(undefined),
 		captureVisibleTab: vi.fn().mockResolvedValue('data:image/png;base64,abc'),
+		group: vi.fn().mockResolvedValue(4),
 		...overrides,
 	}
 	;(globalThis as any).chrome = {
@@ -33,6 +35,17 @@ function dispatch(action: string, payload: any = {}) {
 describe('handleTabControlMessage tab operations', () => {
 	afterEach(() => {
 		delete (globalThis as any).chrome
+	})
+
+	it('gets the active tab from the last focused window', async () => {
+		const tabs = installChromeMock()
+
+		await expect(dispatch('get_active_tab')).resolves.toEqual({
+			success: true,
+			tab: { id: 7, windowId: 3 },
+		})
+
+		expect(tabs.query).toHaveBeenCalledWith({ active: true, lastFocusedWindow: true })
 	})
 
 	it('activates, reloads, and navigates tabs through chrome.tabs', async () => {
@@ -61,5 +74,22 @@ describe('handleTabControlMessage tab operations', () => {
 		})
 
 		expect(tabs.captureVisibleTab).toHaveBeenCalledWith(3, { format: 'png' })
+	})
+
+	it('returns tab group creation failures without writing extension errors', async () => {
+		const tabs = installChromeMock({
+			group: vi.fn().mockRejectedValue(new Error('Tabs cannot be edited right now')),
+		} as Partial<typeof chrome.tabs>)
+		const errorSpy = vi.spyOn(console, 'error').mockImplementation(() => {})
+
+		await expect(dispatch('create_tab_group', { tabIds: [7], windowId: 3 })).resolves.toEqual({
+			error: 'Tabs cannot be edited right now',
+		})
+
+		expect(tabs.group).toHaveBeenCalledWith({
+			tabIds: [7],
+			createProperties: { windowId: 3 },
+		})
+		expect(errorSpy).not.toHaveBeenCalled()
 	})
 })

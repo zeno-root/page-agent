@@ -1,11 +1,12 @@
 {
     "name": "@page-agent/ext",
     "private": true,
-    "version": "1.10.0",
+    "version": "1.8.0",
     "type": "module",
     "scripts": {
         "dev": "wxt",
         "build:ext": "wxt build",
+        "test": "vitest run",
         "zip": "wxt zip",
         "postinstall": "wxt prepare"
     },

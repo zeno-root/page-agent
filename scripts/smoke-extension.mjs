@@ -99,8 +99,24 @@ function findIndex(content, label) {
 	return Number(match[1])
 }
 
-async function sendPageControl(extensionPage, targetTabId, action, payload) {
-	return extensionPage.evaluate(
+async function openExtensionControlPage(context, extensionId) {
+	const extensionPage = await context.newPage()
+	const errors = []
+	for (const pageName of ['sidepanel.html', 'hub.html']) {
+		const url = `chrome-extension://${extensionId}/${pageName}`
+		try {
+			await extensionPage.goto(url)
+			return extensionPage
+		} catch (error) {
+			errors.push(`${pageName}: ${error instanceof Error ? error.message : String(error)}`)
+		}
+	}
+	await extensionPage.close().catch(() => {})
+	throw new Error(`Cannot open extension control page. ${errors.join(' | ')}`)
+}
+
+async function sendPageControl(extensionRuntime, targetTabId, action, payload) {
+	return extensionRuntime.evaluate(
 		({ targetTabId, action, payload }) =>
 			chrome.runtime.sendMessage({
 				type: 'PAGE_CONTROL',
@@ -135,14 +151,13 @@ async function main() {
 		const extensionId = worker
 			? extensionIdFromWorker(worker)
 			: extensionIdFromManifest(extensionPath)
-		const extensionPage = await context.newPage()
-		await extensionPage.goto(`chrome-extension://${extensionId}/sidepanel.html`)
+		const extensionRuntime = await openExtensionControlPage(context, extensionId)
 		await waitForExtensionWorker(context).catch(() => null)
 
 		const page = await context.newPage()
 		await page.goto(`http://127.0.0.1:${port}/`)
 		await page.waitForLoadState('domcontentloaded')
-		const targetTabId = await extensionPage.evaluate(
+		const targetTabId = await extensionRuntime.evaluate(
 			(url) =>
 				chrome.tabs.query({}).then((tabs) => {
 					const tab = tabs.find((candidate) => candidate.url === url)
@@ -152,7 +167,7 @@ async function main() {
 			page.url()
 		)
 
-		const browserState = await sendPageControl(extensionPage, targetTabId, 'get_browser_state')
+		const browserState = await sendPageControl(extensionRuntime, targetTabId, 'get_browser_state')
 		if (!browserState?.content)
 			throw new Error(`Missing browser state: ${JSON.stringify(browserState)}`)
 
@@ -160,14 +175,14 @@ async function main() {
 		const inputIndex = findIndex(browserState.content, 'Name input')
 		const fileIndex = findIndex(browserState.content, 'Upload input')
 
-		const clickResult = await sendPageControl(extensionPage, targetTabId, 'click_element', [
+		const clickResult = await sendPageControl(extensionRuntime, targetTabId, 'click_element', [
 			clickIndex,
 		])
-		const inputResult = await sendPageControl(extensionPage, targetTabId, 'input_text', [
+		const inputResult = await sendPageControl(extensionRuntime, targetTabId, 'input_text', [
 			inputIndex,
 			'Codex smoke',
 		])
-		const fileResult = await sendPageControl(extensionPage, targetTabId, 'upload_file', [
+		const fileResult = await sendPageControl(extensionRuntime, targetTabId, 'upload_file', [
 			fileIndex,
 			{
 				name: 'smoke.txt',
@@ -176,16 +191,16 @@ async function main() {
 				size: 5,
 			},
 		])
-		const textResult = await sendPageControl(extensionPage, targetTabId, 'extract_page_text', [
+		const textResult = await sendPageControl(extensionRuntime, targetTabId, 'extract_page_text', [
 			{ maxLength: 1000 },
 		])
 		const tableResult = await sendPageControl(
-			extensionPage,
+			extensionRuntime,
 			targetTabId,
 			'extract_structured_table',
 			[{ maxLength: 1000 }]
 		)
-		const jsResult = await sendPageControl(extensionPage, targetTabId, 'execute_javascript', {
+		const jsResult = await sendPageControl(extensionRuntime, targetTabId, 'execute_javascript', {
 			script: 'return document.title',
 			timeoutMs: 8000,
 			maxLength: 4000,
@@ -223,7 +238,7 @@ async function main() {
 			)
 		}
 
-		const tabsResult = await extensionPage.evaluate(() =>
+		const tabsResult = await extensionRuntime.evaluate(() =>
 			chrome.runtime.sendMessage({
 				type: 'TAB_CONTROL',
 				action: 'get_window_tabs',
@@ -236,11 +251,11 @@ async function main() {
 
 		const restrictedPage = await context.newPage()
 		await restrictedPage.goto('chrome://settings/')
-		const restrictedTabId = await extensionPage.evaluate(() =>
+		const restrictedTabId = await extensionRuntime.evaluate(() =>
 			chrome.tabs.query({ active: true, currentWindow: true }).then((tabs) => tabs[0]?.id)
 		)
 		const restrictedResult = await sendPageControl(
-			extensionPage,
+			extensionRuntime,
 			restrictedTabId,
 			'get_browser_state'
 		)

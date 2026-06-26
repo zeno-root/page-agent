@@ -44,7 +44,7 @@ export default defineConfig({
 		default_locale: 'zh_CN',
 		name: '__MSG_extName__',
 		description: '__MSG_extDescription__',
-		homepage_url: 'https://aigc.indofun.com/',
+		homepage_url: 'https://indofun.ai/',
 		permissions: ['tabs', 'tabGroups', 'sidePanel', 'storage', 'scripting'],
 		host_permissions: ['<all_urls>'],
 		icons: {
