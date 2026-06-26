@@ -56,6 +56,13 @@ export function handlePageControlMessage(
 			sendResponse(result)
 		})
 		.catch((error) => {
+			if (isMissingContentScriptReceiverError(error)) {
+				sendResponse({
+					success: false,
+					error: 'NO_CONTENT_SCRIPT_RECEIVER: Target tab is not ready for Page Agent controls.',
+				})
+				return
+			}
 			console.error(PREFIX, error)
 			sendResponse({
 				success: false,
@@ -64,6 +71,11 @@ export function handlePageControlMessage(
 		})
 
 	return true // async response
+}
+
+function isMissingContentScriptReceiverError(error: unknown): boolean {
+	const message = error instanceof Error ? error.message : typeof error === 'string' ? error : ''
+	return message.includes('Could not establish connection') && message.includes('Receiving end')
 }
 
 async function executeJavascriptInTab(

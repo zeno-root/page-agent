@@ -26,6 +26,7 @@ function dispatch(action: string, payload: any = {}) {
 
 describe('handlePageControlMessage execute_javascript', () => {
 	afterEach(() => {
+		vi.restoreAllMocks()
 		delete (globalThis as any).chrome
 	})
 
@@ -66,5 +67,20 @@ describe('handlePageControlMessage execute_javascript', () => {
 			action: 'get_browser_state',
 			payload: {},
 		})
+	})
+
+	it('does not log missing content-script receivers as extension errors', async () => {
+		const { tabs } = installChromeMock()
+		const errorSpy = vi.spyOn(console, 'error').mockImplementation(() => {})
+		tabs.sendMessage.mockRejectedValueOnce(
+			new Error('Could not establish connection. Receiving end does not exist.')
+		)
+
+		await expect(dispatch('get_browser_state')).resolves.toEqual({
+			success: false,
+			error: 'NO_CONTENT_SCRIPT_RECEIVER: Target tab is not ready for Page Agent controls.',
+		})
+
+		expect(errorSpy).not.toHaveBeenCalled()
 	})
 })

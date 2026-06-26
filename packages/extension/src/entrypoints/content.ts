@@ -1,5 +1,9 @@
 import { initPageController } from '@/agent/RemotePageController.content'
-import { shouldStopContentPolling } from '@/agent/contentRuntimeGuards'
+import {
+	getContentRuntimeErrorMessage,
+	shouldStopContentPolling,
+} from '@/agent/contentRuntimeGuards'
+import { shouldExposePageBridge } from '@/agent/pageBridgeAuth'
 
 // import { DEMO_CONFIG } from '@/agent/constants'
 
@@ -23,18 +27,20 @@ async function initializePageBridge() {
 		if (!storageLocal) return
 		const result = await storageLocal.get('PageAgentExtUserAuthToken')
 
-		// extension side token.
-		// @note this is isolated world. it is safe to assume user script cannot access it
-		const extToken = result.PageAgentExtUserAuthToken
-		if (!extToken) return
-
-		// page side token
+		const extToken =
+			typeof result.PageAgentExtUserAuthToken === 'string' ? result.PageAgentExtUserAuthToken : null
 		const pageToken = localStorage.getItem('PageAgentExtUserAuthToken')
-		if (!pageToken) return
+		if (
+			!shouldExposePageBridge({
+				href: window.location.href,
+				extensionToken: extToken,
+				pageToken,
+			})
+		) {
+			return
+		}
 
-		if (pageToken !== extToken) return
-
-		console.log('[PageAgentExt]: Auth tokens match. Exposing agent to page.')
+		console.log('[PageAgentExt]: Page bridge authorized. Exposing agent to page.')
 
 		// add isolated world script
 		await exposeAgentToPage()
@@ -161,7 +167,7 @@ async function exposeAgentToPage() {
 							channel: 'PAGE_AGENT_EXT_RESPONSE',
 							id,
 							action: 'execute_result',
-							error: (error as Error).message,
+							error: getContentRuntimeErrorMessage(error),
 						},
 						'*'
 					)
